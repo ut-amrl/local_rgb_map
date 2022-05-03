@@ -27,7 +27,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <opencv4/opencv2/imgproc.hpp>
+#include <opencv2/calib3d.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include <vector>
 
 #include "amrl_msgs/Localization2DMsg.h"
@@ -54,6 +56,8 @@ DEFINE_string(image_topic, "/camera/rgb/image_raw/compressed",
 
 bool run_ = true;
 cv::Mat last_image_;
+Vector2f last_image_loc_ = {0, 0};
+float last_image_angle_ = 0;
 Vector2f current_loc_ = {0, 0};
 float current_angle_ = 0;
 
@@ -63,17 +67,42 @@ void SignalHandler(int) {
     exit(0);
   }
   printf("Exiting.\n");
+  cv::destroyAllWindows();
   run_ = false;
 }
 
 void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
+  // TODO: think about if there's a better place to put these
+  static const cv::Point2f image_offset = {1280 / 2, 720};
+  static const int pixels_per_meter = 100;
+  static const vector<cv::Point2f> src_pts = {
+      {358, 512}, {472, 383}, {743, 378}, {835, 503}};
+  static const vector<cv::Point2f> dst_pts = {
+      cv::Point2f{-0.5, -1.5} * pixels_per_meter + image_offset,
+      cv::Point2f{-0.5, -2.5} * pixels_per_meter + image_offset,
+      cv::Point2f{0.5, -2.5} * pixels_per_meter + image_offset,
+      cv::Point2f{0.5, -1.5} * pixels_per_meter + image_offset};
+  static const cv::Mat M = cv::getPerspectiveTransform(src_pts, dst_pts);
+
+  Vector2f new_loc = {msg.pose.x, msg.pose.y};
+  float new_angle = msg.pose.theta;
+
+  auto image = last_image_.clone();
+  if (image.size[0] > 10) {
+    // transform existing image
+    cv::warpPerspective(image, image, M, image.size());
+    // cv::imshow("image", image);
+    // cv::waitKey(33);
+
+    // combine latest image with local map
+  }
+
+  current_loc_ = new_loc;
+  current_angle_ = new_angle;
+
   if (FLAGS_v > 0) {
     printf("Localization t=%f\n", GetWallTime());
   }
-  // Do things here
-
-  current_loc_ = {msg.pose.x, msg.pose.y};
-  current_angle_ = msg.pose.theta;
 }
 
 void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
@@ -81,6 +110,9 @@ void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
     cv_bridge::CvImagePtr image =
         cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     last_image_ = image->image;
+    cv::cvtColor(last_image_, last_image_, cv::COLOR_BGR2BGRA);
+    last_image_loc_ = current_loc_;
+    last_image_angle_ = current_angle_;
     if (FLAGS_v > 0) {
       printf("Got image");
     }
