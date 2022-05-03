@@ -19,54 +19,43 @@
 */
 //========================================================================
 
-#include <signal.h>
-#include <stdlib.h>
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
+#include <cv_bridge/cv_bridge.h>
 #include <inttypes.h>
+#include <math.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <opencv4/opencv2/imgproc.hpp>
 #include <vector>
 
-#include "glog/logging.h"
-#include "gflags/gflags.h"
+#include "amrl_msgs/Localization2DMsg.h"
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
-#include "amrl_msgs/Localization2DMsg.h"
 #include "gflags/gflags.h"
-#include "geometry_msgs/Pose2D.h"
-#include "geometry_msgs/PoseArray.h"
-#include "geometry_msgs/PoseStamped.h"
-#include "geometry_msgs/PoseWithCovarianceStamped.h"
-#include "sensor_msgs/LaserScan.h"
-#include "visualization_msgs/Marker.h"
-#include "visualization_msgs/MarkerArray.h"
-#include "nav_msgs/Odometry.h"
+#include "glog/logging.h"
 #include "ros/ros.h"
+#include "sensor_msgs/CompressedImage.h"
 #include "shared/math/math_util.h"
-#include "shared/util/timer.h"
 #include "shared/ros/ros_helpers.h"
-
+#include "shared/util/timer.h"
 #include "std_msgs/String.h"
 
 using amrl_msgs::Localization2DMsg;
-using math_util::DegToRad;
-using math_util::RadToDeg;
-using ros::Time;
-using ros_helpers::Eigen3DToRosPoint;
-using ros_helpers::Eigen2DToRosPoint;
-using ros_helpers::RosPoint;
-using ros_helpers::SetRosVector;
-using std::string;
-using std::vector;
 using Eigen::Vector2f;
+using ros::Time;
+using std::vector;
 
 // Create command line arguments
 DEFINE_string(loc_topic, "localization", "Name of ROS topic for localization");
-DEFINE_string(init_topic,
-              "initialpose",
-              "Name of ROS topic for initialization");
+DEFINE_string(image_topic, "/camera/rgb/image_raw/compressed",
+              "Name of ROS topic for compressed image data");
 
 bool run_ = true;
+cv::Mat last_image_;
+Vector2f current_loc_ = {0, 0};
+float current_angle_ = 0;
 
 void SignalHandler(int) {
   if (!run_) {
@@ -81,6 +70,24 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
   if (FLAGS_v > 0) {
     printf("Localization t=%f\n", GetWallTime());
   }
+  // Do things here
+
+  current_loc_ = {msg.pose.x, msg.pose.y};
+  current_angle_ = msg.pose.theta;
+}
+
+void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
+  try {
+    cv_bridge::CvImagePtr image =
+        cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+    last_image_ = image->image;
+    if (FLAGS_v > 0) {
+      printf("Got image");
+    }
+  } catch (cv_bridge::Exception& e) {
+    fprintf(stderr, "cv_bridge exception: %s\n", e.what());
+    return;
+  }
 }
 
 int main(int argc, char** argv) {
@@ -92,6 +99,8 @@ int main(int argc, char** argv) {
 
   ros::Subscriber localization_sub =
       n.subscribe(FLAGS_loc_topic, 1, &LocalizationCallback);
+  ros::Subscriber image_sub =
+      n.subscribe(FLAGS_image_topic, 10, &ImageCallback);
 
   RateLoop loop(20.0);
   while (run_ && ros::ok()) {

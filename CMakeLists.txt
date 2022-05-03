@@ -30,7 +30,7 @@ SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 SET(libs roslib roscpp rosbag glog gflags amrl_shared_lib boost_system lua5.1
-    pthread ${OpenCV_LIBS})
+    pthread)
 
 ADD_SUBDIRECTORY(src/shared)
 INCLUDE_DIRECTORIES(src/shared)
@@ -40,4 +40,4 @@ INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
 ROSBUILD_ADD_EXECUTABLE(lmap
                         src/local_rgb_map/local_rgb_map_main.cc)
 
-TARGET_LINK_LIBRARIES(lmap ${libs})
+TARGET_LINK_LIBRARIES(lmap ${libs} ${OpenCV_LIBS})
