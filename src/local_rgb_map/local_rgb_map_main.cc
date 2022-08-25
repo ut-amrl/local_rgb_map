@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "amrl_msgs/Localization2DMsg.h"
+#include "config_reader/config_reader.h"
 #include "cv_bridge/cv_bridge.h"
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
@@ -51,9 +52,8 @@ using ros::Time;
 using std::vector;
 
 // Create command line arguments
-DEFINE_string(loc_topic, "localization", "Name of ROS topic for localization");
-DEFINE_string(image_topic, "/camera/rgb/image_raw/compressed",
-              "Name of ROS topic for compressed image data");
+CONFIG_STRING(localization_topic, "BEVParameters.localization_topic");
+CONFIG_STRING(image_topic, "BEVParameters.image_topic");
 DEFINE_bool(visualize, false, "show opencv visualization of cost map");
 
 bool run_ = true;
@@ -182,19 +182,21 @@ void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, false);
   signal(SIGINT, SignalHandler);
+
   // Initialize ROS.
   ros::init(argc, argv, "local_rgb_map", ros::init_options::NoSigintHandler);
   ros::NodeHandle n;
 
   ros::Subscriber localization_sub =
-      n.subscribe(FLAGS_loc_topic, 1, &LocalizationCallback);
+      n.subscribe(CONFIG_localization_topic, 1, &LocalizationCallback);
   ros::Subscriber image_sub =
-      n.subscribe(FLAGS_image_topic, 10, &ImageCallback);
+      n.subscribe(CONFIG_image_topic, 10, &ImageCallback);
 
   RateLoop loop(20.0);
   while (run_ && ros::ok()) {
     ros::spinOnce();
     loop.Sleep();
   }
+
   return 0;
 }
