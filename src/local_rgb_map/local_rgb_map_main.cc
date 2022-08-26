@@ -51,10 +51,12 @@ using Eigen::Vector2f;
 using ros::Time;
 using std::vector;
 
-// Create command line arguments
 CONFIG_STRING(localization_topic, "BEVParameters.localization_topic");
 CONFIG_STRING(image_topic, "BEVParameters.image_topic");
-DEFINE_bool(visualize, false, "show opencv visualization of cost map");
+CONFIG_INT(pixels_per_meter, "BEVParameters.pixels_per_meter");
+CONFIG_INT(image_size, "BEVParameters.image_size");
+
+DEFINE_bool(visualize, false, "show opencv visualization of  map");
 
 bool run_ = true;
 cv::Mat last_image_;
@@ -62,7 +64,11 @@ Vector2f last_image_loc_ = {0, 0};
 float last_image_angle_ = 0;
 Vector2f current_loc_ = {0, 0};
 float current_angle_ = 0;
-cv::Mat local_cost_map_ = cv::Mat::zeros(800, 800, CV_8UC4);
+cv::Mat bev_image_ =
+    cv::Mat::zeros(CONFIG_pixels_per_meter * CONFIG_image_size,
+                   CONFIG_pixels_per_meter* CONFIG_image_size, CV_8UC4);
+
+ros::Publisher bev_pub;
 
 void SignalHandler(int) {
   if (!run_) {
@@ -74,14 +80,14 @@ void SignalHandler(int) {
   run_ = false;
 }
 
-void UpdateMapFrame(Eigen::Vector2f loc, float angle) {
+void UpdateFrame(Eigen::Vector2f loc, float angle) {
   auto current_transform =
       Eigen::Translation2f(current_loc_) * Eigen::Rotation2Df(current_angle_);
   auto new_transform = Eigen::Translation2f(loc) * Eigen::Rotation2Df(angle);
   Eigen::Affine2f delta_transform = current_transform.inverse() * new_transform;
 
-  cv::Mat flipped_cost_map;
-  cv::flip(local_cost_map_, flipped_cost_map, 0);
+  cv::Mat flipped_image;
+  cv::flip(bev_image_, flipped_image, 0);
 
   cv::Mat translation_mat;
   Eigen::Matrix2f eigen_rot = Eigen::Rotation2Df(-M_PI_2) *
@@ -100,55 +106,59 @@ void UpdateMapFrame(Eigen::Vector2f loc, float angle) {
 
   transform_matrix(cv::Rect(2, 0, 1, 2)) -= translation_mat;
 
-  auto prev_cost_map = flipped_cost_map.clone();
-  flipped_cost_map.setTo(0);
-  cv::warpAffine(prev_cost_map, flipped_cost_map, transform_matrix,
-                 flipped_cost_map.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT,
+  auto prev_map = flipped_image.clone();
+  flipped_image.setTo(0);
+  cv::warpAffine(prev_map, flipped_image, transform_matrix,
+                 flipped_image.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT,
                  0);
-  local_cost_map_.setTo(0);
-  cv::flip(flipped_cost_map, local_cost_map_, 0);
+  bev_image_.setTo(0);
+  cv::flip(flipped_image, bev_image_, 0);
 }
 
-void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
-  // TODO: think about if there's a better place to put these
+void ConvertToBEV(const cv::Mat& original, cv::Mat& output) {
   static const cv::Point2f image_offset = {1280 / 2, 720};
-  static const int pixels_per_meter = 100;
   static const vector<cv::Point2f> src_pts = {
       {358, 512}, {472, 383}, {743, 378}, {835, 503}};
   static const vector<cv::Point2f> dst_pts = {
-      cv::Point2f{-0.5, -1.5} * pixels_per_meter + image_offset,
-      cv::Point2f{-0.5, -2.5} * pixels_per_meter + image_offset,
-      cv::Point2f{0.5, -2.5} * pixels_per_meter + image_offset,
-      cv::Point2f{0.5, -1.5} * pixels_per_meter + image_offset};
+      cv::Point2f{-0.5, -1.5} * CONFIG_pixels_per_meter + image_offset,
+      cv::Point2f{-0.5, -2.5} * CONFIG_pixels_per_meter + image_offset,
+      cv::Point2f{0.5, -2.5} * CONFIG_pixels_per_meter + image_offset,
+      cv::Point2f{0.5, -1.5} * CONFIG_pixels_per_meter + image_offset};
   static const cv::Mat M = cv::getPerspectiveTransform(src_pts, dst_pts);
+
   static float vals[] = {1.0, 0.0, -240, 0.0, 1.0, -720 / 2};
   static const cv::Mat translation_matrix = cv::Mat(2, 3, CV_32F, vals);
 
+  cv::warpPerspective(original, output, M, original.size());
+  cv::warpAffine(output, output, translation_matrix, output.size());
+}
+
+void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
   Vector2f new_loc = {msg.pose.x, msg.pose.y};
   float new_angle = msg.pose.theta;
 
-  auto img_copy = last_image_.clone();
-  cv::Mat image = cv::Mat::zeros(800, 800, last_image_.type());
   if (last_image_.size[0] > 10) {
-    // transform existing image
-    cv::warpPerspective(img_copy, img_copy, M, img_copy.size());
-    cv::warpAffine(img_copy, image, translation_matrix, image.size());
+    cv::Mat image = cv::Mat::zeros(bev_image_.size(), last_image_.type());
+    ConvertToBEV(last_image_, image);
 
-    UpdateMapFrame(new_loc, new_angle);
+    UpdateFrame(new_loc, new_angle);
 
     // combine latest image with local map
-    for (int y = 0; y < local_cost_map_.rows; y++) {
-      for (int x = 0; x < local_cost_map_.cols; x++) {
+    for (int y = 0; y < bev_image_.rows; y++) {
+      for (int x = 0; x < bev_image_.cols; x++) {
         auto img_pixel = image.at<cv::Vec4b>(y, x);
         if (img_pixel[3] > 0) {
-          local_cost_map_.at<cv::Vec4b>(y, x) = img_pixel;
+          bev_image_.at<cv::Vec4b>(y, x) = img_pixel;
         }
       }
     }
 
     if (FLAGS_visualize) {
-      cv::Mat vis_map = local_cost_map_.clone();
-      cv::circle(vis_map, {400, 400}, 5, 0x0000FF);
+      cv::Mat vis_map = bev_image_.clone();
+      cv::circle(vis_map,
+                 {CONFIG_image_size * CONFIG_pixels_per_meter / 2,
+                  CONFIG_image_size * CONFIG_pixels_per_meter / 2},
+                 5, 0x0000FF);
       cv::imshow("lmap", vis_map);
       cv::waitKey(1);
     }
@@ -186,6 +196,8 @@ int main(int argc, char** argv) {
   // Initialize ROS.
   ros::init(argc, argv, "local_rgb_map", ros::init_options::NoSigintHandler);
   ros::NodeHandle n;
+
+  bev_pub = n.advertise<sensor_msgs::CompressedImage>("bev_image", 1);
 
   ros::Subscriber localization_sub =
       n.subscribe(CONFIG_localization_topic, 1, &LocalizationCallback);
