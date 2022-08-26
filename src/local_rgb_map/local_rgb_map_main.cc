@@ -123,18 +123,43 @@ void UpdateFrame(Eigen::Vector2f loc, float angle) {
 }
 
 void ConvertToBEV(const cv::Mat& original, cv::Mat& output) {
-  static const cv::Point2f image_offset = {1280 / 2, 720};
-  static const vector<cv::Point2f> src_pts = {
-      {358, 512}, {472, 383}, {743, 378}, {835, 503}};
-  static const vector<cv::Point2f> dst_pts = {
-      cv::Point2f{-0.5, -1.5} * CONFIG_pixels_per_meter + image_offset,
-      cv::Point2f{-0.5, -2.5} * CONFIG_pixels_per_meter + image_offset,
-      cv::Point2f{0.5, -2.5} * CONFIG_pixels_per_meter + image_offset,
-      cv::Point2f{0.5, -1.5} * CONFIG_pixels_per_meter + image_offset};
-  static const cv::Mat M = cv::getPerspectiveTransform(src_pts, dst_pts);
+  static cv::Mat M;
+  static cv::Mat translation_matrix;
 
-  static float vals[] = {1.0, 0.0, -240, 0.0, 1.0, -720 / 2};
-  static const cv::Mat translation_matrix = cv::Mat(2, 3, CV_32F, vals);
+  if (M.size[0] < 3) {
+    vector<cv::Point2f> input_points;
+    vector<cv::Point2f> output_points;
+    for (int i = 0; i < camera_H.rows; i++) {
+      auto input_point =
+          cv::Point2f(camera_H.at<double>(i, 2), camera_H.at<double>(i, 3));
+      auto output_point =
+          cv::Point2f(camera_H.at<double>(i, 0), camera_H.at<double>(i, 1));
+      input_points.push_back(input_point);
+      output_points.push_back(output_point);
+    }
+
+    auto offset =
+        cv::Point2f{(float)last_image_.size[1] / 2, (float)last_image_.size[0]};
+    for (auto& p : output_points) {
+      p *= CONFIG_pixels_per_meter;
+      p += offset;
+    }
+
+    M = cv::getPerspectiveTransform(input_points, output_points);
+
+    float vals[] = {1.0,
+                    0.0,
+                    (float)(CONFIG_pixels_per_meter * CONFIG_image_size / 2 -
+                            last_image_.size[1] / 2),
+                    0.0,
+                    1.0,
+                    (float)(CONFIG_pixels_per_meter * CONFIG_image_size / 2 -
+                            last_image_.size[0])};
+    translation_matrix =
+        cv::Mat(2, 3, CV_32F, vals)
+            .clone();  // clone is necessary so we don't have a pointer to out
+                       // of scope stack array "vals"
+  }
 
   // maybe make this static later for better performance
   cv::Mat cp = original.clone();
@@ -198,6 +223,46 @@ void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
   }
 }
 
+// Mostly grabbed from graph_navigation
+int LoadCameraCalibrationCV() {
+  cv::FileStorage camera_settings(CONFIG_camera_calibration_path,
+                                  cv::FileStorage::READ);
+
+  if (!camera_settings.isOpened()) {
+    std::cerr << "Failed to open camera settings file at: "
+              << CONFIG_camera_calibration_path << std::endl;
+    return -1;
+  }
+
+  cv::FileNode node = camera_settings["K"];
+  if (!node.empty()) {
+    camera_K = node.mat();
+  } else {
+    std::cerr << "Camera calibration matrix not read! Check configuration "
+                 "file is in default yaml format.";
+  }
+
+  node = camera_settings["D"];
+  if (!node.empty()) {
+    camera_D = node.mat();
+  } else {
+    std::cerr << "Camera distortion coefficients not read! Check "
+                 "configuration file is in default yaml format.";
+  }
+
+  node = camera_settings["H"];
+  if (!node.empty()) {
+    camera_H = node.mat();
+  } else {
+    std::cerr << "Camera homography matrix not read! Check configuration file "
+                 "is in default yaml format.";
+  }
+
+  std::cout << camera_H << std::endl;
+
+  return 0;
+}
+
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, false);
   signal(SIGINT, SignalHandler);
@@ -206,6 +271,7 @@ int main(int argc, char** argv) {
   bev_image_ =
       cv::Mat::zeros(CONFIG_pixels_per_meter * CONFIG_image_size,
                      CONFIG_pixels_per_meter * CONFIG_image_size, CV_8UC4);
+  LoadCameraCalibrationCV();
 
   // Initialize ROS.
   ros::init(argc, argv, "local_rgb_map", ros::init_options::NoSigintHandler);
