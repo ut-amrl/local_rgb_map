@@ -55,18 +55,25 @@ CONFIG_STRING(localization_topic, "BEVParameters.localization_topic");
 CONFIG_STRING(image_topic, "BEVParameters.image_topic");
 CONFIG_INT(pixels_per_meter, "BEVParameters.pixels_per_meter");
 CONFIG_INT(image_size, "BEVParameters.image_size");
+CONFIG_STRING(camera_calibration_path,
+              "BEVParameters.camera_calibration_config_path");
 
+DEFINE_string(config, "config/local_rgb_map.lua", "path to config file");
 DEFINE_bool(visualize, false, "show opencv visualization of  map");
 
 bool run_ = true;
+
 cv::Mat last_image_;
+cv::Mat bev_image_;
+
 Vector2f last_image_loc_ = {0, 0};
 float last_image_angle_ = 0;
 Vector2f current_loc_ = {0, 0};
 float current_angle_ = 0;
-cv::Mat bev_image_ =
-    cv::Mat::zeros(CONFIG_pixels_per_meter * CONFIG_image_size,
-                   CONFIG_pixels_per_meter* CONFIG_image_size, CV_8UC4);
+
+cv::Mat camera_K;
+cv::Mat camera_D;
+cv::Mat camera_H;
 
 ros::Publisher bev_pub;
 
@@ -129,13 +136,19 @@ void ConvertToBEV(const cv::Mat& original, cv::Mat& output) {
   static float vals[] = {1.0, 0.0, -240, 0.0, 1.0, -720 / 2};
   static const cv::Mat translation_matrix = cv::Mat(2, 3, CV_32F, vals);
 
-  cv::warpPerspective(original, output, M, original.size());
-  cv::warpAffine(output, output, translation_matrix, output.size());
+  // maybe make this static later for better performance
+  cv::Mat cp = original.clone();
+  cv::warpPerspective(original, cp, M, cp.size());
+  cv::warpAffine(cp, output, translation_matrix, output.size());
 }
 
 void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
   Vector2f new_loc = {msg.pose.x, msg.pose.y};
   float new_angle = msg.pose.theta;
+
+  if (FLAGS_v > 0) {
+    printf("Localization t=%f\n", GetWallTime());
+  }
 
   if (last_image_.size[0] > 10) {
     cv::Mat image = cv::Mat::zeros(bev_image_.size(), last_image_.type());
@@ -166,10 +179,6 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
 
   current_loc_ = new_loc;
   current_angle_ = new_angle;
-
-  if (FLAGS_v > 0) {
-    printf("Localization t=%f\n", GetWallTime());
-  }
 }
 
 void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
@@ -181,7 +190,7 @@ void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
     last_image_loc_ = current_loc_;
     last_image_angle_ = current_angle_;
     if (FLAGS_v > 0) {
-      printf("Got image");
+      printf("Got image\n");
     }
   } catch (cv_bridge::Exception& e) {
     fprintf(stderr, "cv_bridge exception: %s\n", e.what());
@@ -192,6 +201,11 @@ void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, false);
   signal(SIGINT, SignalHandler);
+
+  config_reader::ConfigReader reader({FLAGS_config});
+  bev_image_ =
+      cv::Mat::zeros(CONFIG_pixels_per_meter * CONFIG_image_size,
+                     CONFIG_pixels_per_meter * CONFIG_image_size, CV_8UC4);
 
   // Initialize ROS.
   ros::init(argc, argv, "local_rgb_map", ros::init_options::NoSigintHandler);
