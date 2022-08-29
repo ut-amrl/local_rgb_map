@@ -35,10 +35,12 @@
 #include "eigen3/Eigen/Geometry"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
+#include "image_transport/image_transport.h"
 #include "opencv2/calib3d.hpp"
 #include "opencv2/core/eigen.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
+#include "ros/message_traits.h"
 #include "ros/ros.h"
 #include "sensor_msgs/CompressedImage.h"
 #include "shared/math/math_util.h"
@@ -48,7 +50,6 @@
 
 using amrl_msgs::Localization2DMsg;
 using Eigen::Vector2f;
-using ros::Time;
 using std::vector;
 
 CONFIG_STRING(localization_topic, "BEVParameters.localization_topic");
@@ -74,8 +75,6 @@ float current_angle_ = 0;
 cv::Mat camera_K;
 cv::Mat camera_D;
 cv::Mat camera_H;
-
-ros::Publisher bev_pub;
 
 void SignalHandler(int) {
   if (!run_) {
@@ -276,8 +275,10 @@ int main(int argc, char** argv) {
   // Initialize ROS.
   ros::init(argc, argv, "local_rgb_map", ros::init_options::NoSigintHandler);
   ros::NodeHandle n;
+  image_transport::ImageTransport it(n);
 
-  bev_pub = n.advertise<sensor_msgs::CompressedImage>("bev_image", 1);
+  auto bev_pub = it.advertise("bev_image", 1);
+  auto bev_img = cv_bridge::CvImage(std_msgs::Header(), "bgr8", bev_image_);
 
   ros::Subscriber localization_sub =
       n.subscribe(CONFIG_localization_topic, 1, &LocalizationCallback);
@@ -286,6 +287,9 @@ int main(int argc, char** argv) {
 
   RateLoop loop(20.0);
   while (run_ && ros::ok()) {
+    bev_img.image = bev_image_;
+    bev_pub.publish(bev_img.toImageMsg());
+
     ros::spinOnce();
     loop.Sleep();
   }
