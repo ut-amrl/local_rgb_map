@@ -60,7 +60,9 @@ CONFIG_STRING(camera_calibration_path,
               "BEVParameters.camera_calibration_config_path");
 
 DEFINE_string(config, "config/local_rgb_map.lua", "path to config file");
-DEFINE_bool(visualize, false, "show opencv visualization of  map");
+DEFINE_bool(visualize, false, "show opencv visualization of map");
+DEFINE_bool(camera_correction, true,
+            "apply distortion and camera matrices to images received");
 
 bool run_ = true;
 
@@ -206,11 +208,20 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
 }
 
 void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
+  static cv::Mat M1, M2;
+  if (M1.size[0] < 1) {
+    auto R = cv::Mat::eye(3, 3, CV_32F);
+    cv::initUndistortRectifyMap(camera_K, camera_D, R, camera_K,
+                                cv::Size(1280, 720), CV_32F, M1, M2);
+  }
+
   try {
     cv_bridge::CvImagePtr image =
         cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     last_image_ = image->image;
     cv::cvtColor(last_image_, last_image_, cv::COLOR_BGR2BGRA);
+    if (FLAGS_camera_correction)
+      cv::remap(last_image_, last_image_, M1, M2, cv::INTER_LINEAR);
     last_image_loc_ = current_loc_;
     last_image_angle_ = current_angle_;
     if (FLAGS_v > 0) {
@@ -256,8 +267,6 @@ int LoadCameraCalibrationCV() {
     std::cerr << "Camera homography matrix not read! Check configuration file "
                  "is in default yaml format.";
   }
-
-  std::cout << camera_H << std::endl;
 
   return 0;
 }
