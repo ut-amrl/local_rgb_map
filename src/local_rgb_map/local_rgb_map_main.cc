@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <opencv2/core/matx.hpp>
 #include <vector>
 
 #include "amrl_msgs/Localization2DMsg.h"
@@ -63,6 +64,7 @@ DEFINE_string(config, "config/local_rgb_map.lua", "path to config file");
 DEFINE_bool(visualize, false, "show opencv visualization of map");
 DEFINE_bool(camera_correction, true,
             "apply distortion and camera matrices to images received");
+DEFINE_double(gamma, 0.5, "moving average factor");
 
 bool run_ = true;
 
@@ -187,7 +189,7 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
       for (int x = 0; x < bev_image_.cols; x++) {
         auto img_pixel = image.at<cv::Vec4b>(y, x);
         if (img_pixel[3] > 0) {
-          bev_image_.at<cv::Vec4b>(y, x) = img_pixel;
+          bev_image_.at<cv::Vec4b>(y, x) = bev_image_.at<cv::Vec4b>(y, x) * FLAGS_gamma + img_pixel * (1 - FLAGS_gamma);
         }
       }
     }
