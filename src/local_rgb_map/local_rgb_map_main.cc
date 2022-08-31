@@ -55,8 +55,10 @@ using std::vector;
 
 CONFIG_STRING(localization_topic, "BEVParameters.localization_topic");
 CONFIG_STRING(image_topic, "BEVParameters.image_topic");
+CONFIG_INT(image_width, "BEVParameters.image_width");
+CONFIG_INT(image_height, "BEVParameters.image_height");
 CONFIG_INT(pixels_per_meter, "BEVParameters.pixels_per_meter");
-CONFIG_INT(image_size, "BEVParameters.image_size");
+CONFIG_INT(bev_size, "BEVParameters.bev_size");
 CONFIG_STRING(camera_calibration_path,
               "BEVParameters.camera_calibration_config_path");
 
@@ -112,7 +114,8 @@ void UpdateFrame(Eigen::Vector2f loc, float angle) {
   rot.fromRotationMatrix(eigen_rot);
 
   auto transform_matrix = cv::getRotationMatrix2D(
-      cv::Point2f{640, 780}, -rot.angle() * (180 / M_PI), 1.0);
+      cv::Point2f{(float)CONFIG_image_width / 2, (float)CONFIG_image_height},
+      -rot.angle() * (180 / M_PI), 1.0);
 
   transform_matrix(cv::Rect(2, 0, 1, 2)) -= translation_mat;
 
@@ -152,11 +155,11 @@ void ConvertToBEV(const cv::Mat& original, cv::Mat& output) {
 
     float vals[] = {1.0,
                     0.0,
-                    (float)(CONFIG_pixels_per_meter * CONFIG_image_size / 2 -
+                    (float)(CONFIG_pixels_per_meter * CONFIG_bev_size / 2 -
                             last_image_.size[1] / 2),
                     0.0,
                     1.0,
-                    (float)(CONFIG_pixels_per_meter * CONFIG_image_size / 2 -
+                    (float)(CONFIG_pixels_per_meter * CONFIG_bev_size / 2 -
                             last_image_.size[0])};
     translation_matrix =
         cv::Mat(2, 3, CV_32F, vals)
@@ -189,7 +192,9 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
       for (int x = 0; x < bev_image_.cols; x++) {
         auto img_pixel = image.at<cv::Vec4b>(y, x);
         if (img_pixel[3] > 0) {
-          bev_image_.at<cv::Vec4b>(y, x) = bev_image_.at<cv::Vec4b>(y, x) * FLAGS_gamma + img_pixel * (1 - FLAGS_gamma);
+          bev_image_.at<cv::Vec4b>(y, x) =
+              bev_image_.at<cv::Vec4b>(y, x) * FLAGS_gamma +
+              img_pixel * (1 - FLAGS_gamma);
         }
       }
     }
@@ -197,8 +202,8 @@ void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
     if (FLAGS_visualize) {
       cv::Mat vis_map = bev_image_.clone();
       cv::circle(vis_map,
-                 {CONFIG_image_size * CONFIG_pixels_per_meter / 2,
-                  CONFIG_image_size * CONFIG_pixels_per_meter / 2},
+                 {CONFIG_bev_size * CONFIG_pixels_per_meter / 2,
+                  CONFIG_bev_size * CONFIG_pixels_per_meter / 2},
                  5, 0x0000FF);
       cv::imshow("lmap", vis_map);
       cv::waitKey(1);
@@ -213,8 +218,9 @@ void ImageCallback(const sensor_msgs::CompressedImageConstPtr& msg) {
   static cv::Mat M1, M2;
   if (M1.size[0] < 1) {
     auto R = cv::Mat::eye(3, 3, CV_32F);
-    cv::initUndistortRectifyMap(camera_K, camera_D, R, camera_K,
-                                cv::Size(1280, 720), CV_32F, M1, M2);
+    cv::initUndistortRectifyMap(
+        camera_K, camera_D, R, camera_K,
+        cv::Size(CONFIG_image_width, CONFIG_image_height), CV_32F, M1, M2);
   }
 
   try {
@@ -279,8 +285,8 @@ int main(int argc, char** argv) {
 
   config_reader::ConfigReader reader({FLAGS_config});
   bev_image_ =
-      cv::Mat::zeros(CONFIG_pixels_per_meter * CONFIG_image_size,
-                     CONFIG_pixels_per_meter * CONFIG_image_size, CV_8UC4);
+      cv::Mat::zeros(CONFIG_pixels_per_meter * CONFIG_bev_size,
+                     CONFIG_pixels_per_meter * CONFIG_bev_size, CV_8UC4);
   LoadCameraCalibrationCV();
 
   // Initialize ROS.
