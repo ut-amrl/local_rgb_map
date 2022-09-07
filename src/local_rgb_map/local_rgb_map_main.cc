@@ -37,6 +37,7 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "image_transport/image_transport.h"
+#include "nav_msgs/Odometry.h"
 #include "opencv2/calib3d.hpp"
 #include "opencv2/core/eigen.hpp"
 #include "opencv2/highgui.hpp"
@@ -54,6 +55,7 @@ using Eigen::Vector2f;
 using std::vector;
 
 CONFIG_STRING(localization_topic, "BEVParameters.localization_topic");
+CONFIG_STRING(odometry_topic, "BEVParameters.odometry_topic");
 CONFIG_STRING(image_topic, "BEVParameters.image_topic");
 CONFIG_INT(image_width, "BEVParameters.image_width");
 CONFIG_INT(image_height, "BEVParameters.image_height");
@@ -173,9 +175,9 @@ void ConvertToBEV(const cv::Mat& original, cv::Mat& output) {
   cv::warpAffine(cp, output, translation_matrix, output.size());
 }
 
-void LocalizationCallback(const amrl_msgs::Localization2DMsg msg) {
-  Vector2f new_loc = {msg.pose.x, msg.pose.y};
-  float new_angle = msg.pose.theta;
+void OdometryCallback(const nav_msgs::Odometry msg) {
+  Vector2f new_loc = {msg.pose.pose.position.x, msg.pose.pose.position.y};
+  float new_angle = 2 * acos(msg.pose.pose.orientation.w);
 
   if (FLAGS_v > 0) {
     printf("Localization t=%f\n", GetWallTime());
@@ -297,8 +299,8 @@ int main(int argc, char** argv) {
   auto bev_pub = it.advertise("bev_image", 1);
   auto bev_img = cv_bridge::CvImage(std_msgs::Header(), "bgr8", bev_image_);
 
-  ros::Subscriber localization_sub =
-      n.subscribe(CONFIG_localization_topic, 1, &LocalizationCallback);
+  ros::Subscriber odometry_sub =
+      n.subscribe(CONFIG_odometry_topic, 1, &OdometryCallback);
   ros::Subscriber image_sub =
       n.subscribe(CONFIG_image_topic, 10, &ImageCallback);
 
