@@ -69,6 +69,10 @@ DEFINE_bool(visualize, false, "show opencv visualization of map");
 DEFINE_bool(camera_correction, true,
             "apply distortion and camera matrices to images received");
 DEFINE_double(gamma, 0.5, "moving average factor");
+DEFINE_double(update_dist, 0.25,
+              "distance at which to force an update of the local map");
+DEFINE_double(update_angle, 0.08,
+              "angle difference at which to force an update of the local map");
 
 bool run_ = true;
 
@@ -179,24 +183,33 @@ void OdometryCallback(const nav_msgs::Odometry msg) {
   Vector2f new_loc = {msg.pose.pose.position.x, msg.pose.pose.position.y};
   float new_angle = 2 * acos(msg.pose.pose.orientation.w);
 
+  static Vector2f last_update_loc = new_loc;
+  static float last_update_angle = new_angle;
+
   if (FLAGS_v > 0) {
     printf("Localization t=%f\n", GetWallTime());
   }
 
   if (last_image_.size[0] > 10) {
-    cv::Mat image = cv::Mat::zeros(bev_image_.size(), last_image_.type());
-    ConvertToBEV(last_image_, image);
-
     UpdateFrame(new_loc, new_angle);
 
-    // combine latest image with local map
-    for (int y = 0; y < bev_image_.rows; y++) {
-      for (int x = 0; x < bev_image_.cols; x++) {
-        auto img_pixel = image.at<cv::Vec4b>(y, x);
-        if (img_pixel[3] > 0) {
-          bev_image_.at<cv::Vec4b>(y, x) =
-              bev_image_.at<cv::Vec4b>(y, x) * FLAGS_gamma +
-              img_pixel * (1 - FLAGS_gamma);
+    if ((new_loc - last_update_loc).norm() >= FLAGS_update_dist ||
+        abs(new_angle - last_update_angle) >= FLAGS_update_angle) {
+      last_update_loc = new_loc;
+      last_update_angle = new_angle;
+
+      cv::Mat image = cv::Mat::zeros(bev_image_.size(), last_image_.type());
+      ConvertToBEV(last_image_, image);
+
+      // combine latest image with local map
+      for (int y = 0; y < bev_image_.rows; y++) {
+        for (int x = 0; x < bev_image_.cols; x++) {
+          auto img_pixel = image.at<cv::Vec4b>(y, x);
+          if (img_pixel[3] > 0) {
+            bev_image_.at<cv::Vec4b>(y, x) =
+                bev_image_.at<cv::Vec4b>(y, x) * FLAGS_gamma +
+                img_pixel * (1 - FLAGS_gamma);
+          }
         }
       }
     }
@@ -304,7 +317,7 @@ int main(int argc, char** argv) {
   ros::Subscriber image_sub =
       n.subscribe(CONFIG_image_topic, 10, &ImageCallback);
 
-  RateLoop loop(20.0);
+  RateLoop loop(30.0);
   while (run_ && ros::ok()) {
     bev_img.image = bev_image_;
     bev_pub.publish(bev_img.toImageMsg());
