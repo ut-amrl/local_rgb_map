@@ -1,0 +1,6 @@
+[submodule "src/shared"]
+	path = src/shared
+	url = git@github.com:ut-amrl/amrl_shared_lib.git
+[submodule "src/config_reader"]
+	path = src/config_reader
+	url = git@github.com:ut-amrl/config-reader.git

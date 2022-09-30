@@ -34,6 +34,7 @@ SET(libs roslib roscpp rosbag glog gflags amrl_shared_lib boost_system lua5.1
 
 ADD_SUBDIRECTORY(src/shared)
 INCLUDE_DIRECTORIES(src/shared)
+INCLUDE_DIRECTORIES(src/config_reader/include)
 INCLUDE_DIRECTORIES(src)
 INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
 
