@@ -40,5 +40,22 @@ INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
 
 ROSBUILD_ADD_EXECUTABLE(lmap
                         src/local_rgb_map/local_rgb_map_main.cc)
-
 TARGET_LINK_LIBRARIES(lmap ${libs} ${OpenCV_LIBS})
+
+rosbuild_add_executable(bev_node
+  src/bev_node/bev_node_main.cc
+  src/bev/bev.cc
+)
+target_link_libraries(bev_node
+  ${libs}
+  ${OpenCV_LIBS}
+)
+
+add_executable(bev_benchmark
+  src/bev_node/bev_benchmark_main.cc
+  src/bev/bev.cc
+)
+target_link_libraries(bev_benchmark
+  ${libs}
+  ${OpenCV_LIBS}
+)
