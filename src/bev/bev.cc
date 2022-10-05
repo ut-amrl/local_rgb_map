@@ -35,11 +35,13 @@ BirdsEyeView::BirdsEyeView(const Eigen::Matrix3f& intrinsic_matrix,
   const Eigen::Vector2f P_pixel_horizon =
       GroundToPixelCoordinates(Eigen::Vector2f(bev_horizon_distance, 0));
 
+  // The pixel coordinates of the four corners of the visible ground plane in
+  // the original image as [x y] column vectors.
   Eigen::Matrix2Xf P_pixel_planeCorners(2, 4);
   // bottom-left corner
-  P_pixel_planeCorners.col(0) << 0, input_image_cols_ - 1;
+  P_pixel_planeCorners.col(0) << 0, input_image_rows_ - 1;
   // bottom-right corner
-  P_pixel_planeCorners.col(1) << input_image_cols_ - 1, input_image_cols_ - 1;
+  P_pixel_planeCorners.col(1) << input_image_cols_ - 1, input_image_rows_ - 1;
   // top-left corner
   P_pixel_planeCorners.col(2) << 0, P_pixel_horizon.y();
   // top-right corner
