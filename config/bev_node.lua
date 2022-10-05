@@ -7,7 +7,7 @@ SingleBEVParameters = {
     input_image_topic = "/camera/rgb/image_raw/compressed";
     input_image_width = 2048;
     input_image_height = 1536;
-    bev_image_topic = "/camera/rgb/image_bev"; -- image_transport takes the base topic name
+    bev_image_topic = "/bev/single"; -- image_transport takes the base topic name
     bev_pixels_per_meter = 150.0;
     bev_horizon_distance = 5.0;
 
