@@ -96,6 +96,10 @@ cv::Mat3b BirdsEyeView::WarpPerspective(const cv::Mat3b& input_image) const {
   return bev_image;
 }
 
+cv::Size BirdsEyeView::GetBevSize() const {
+  return cv::Size(bev_image_cols_, bev_image_rows_);
+}
+
 Eigen::Matrix2Xf BirdsEyeView::GroundToPixelCoordinates(
     const Eigen::Matrix2Xf& ground_coords) const {
   // Adds back the implicit z row

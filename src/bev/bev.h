@@ -15,6 +15,8 @@ class BirdsEyeView {
 
   cv::Mat3b WarpPerspective(const cv::Mat3b& input_image) const;
 
+  cv::Size GetBevSize() const;
+
  protected:
   Eigen::Matrix2Xf GroundToPixelCoordinates(
       const Eigen::Matrix2Xf& ground_coordinates) const;
