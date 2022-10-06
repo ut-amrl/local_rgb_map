@@ -83,7 +83,7 @@ BirdsEyeView::BirdsEyeView(const Eigen::Matrix3f& intrinsic_matrix,
       cv_P_pixel_planeCorners.t(), cv_P_bevPixel_planeCorners.t());
 }
 
-cv::Mat3b BirdsEyeView::WarpPerspective(const cv::Mat3b& input_image) {
+cv::Mat3b BirdsEyeView::WarpPerspective(const cv::Mat3b& input_image) const {
   LOG_IF(ERROR, input_image.rows != input_image_rows_ ||
                     input_image.cols != input_image_cols_)
       << "Input image dimensions (" << input_image.size()
@@ -96,8 +96,12 @@ cv::Mat3b BirdsEyeView::WarpPerspective(const cv::Mat3b& input_image) {
   return bev_image;
 }
 
+cv::Size BirdsEyeView::GetBevSize() const {
+  return cv::Size(bev_image_cols_, bev_image_rows_);
+}
+
 Eigen::Matrix2Xf BirdsEyeView::GroundToPixelCoordinates(
-    const Eigen::Matrix2Xf& ground_coords) {
+    const Eigen::Matrix2Xf& ground_coords) const {
   // Adds back the implicit z row
   Eigen::Matrix3Xf ground_coords_with_z =
       Eigen::Matrix3Xf::Zero(3, ground_coords.cols());
@@ -114,7 +118,7 @@ Eigen::Matrix2Xf BirdsEyeView::GroundToPixelCoordinates(
 }
 
 Eigen::Matrix2Xf BirdsEyeView::PixelToGroundCoordinates(
-    const Eigen::Matrix2Xf& pixel_coordinates) {
+    const Eigen::Matrix2Xf& pixel_coordinates) const {
   // Calculate the rays originating from the camera corresponding to each pixel,
   // expressed in the world frame. These rays are column vectors with arbitrary
   // magnitude.

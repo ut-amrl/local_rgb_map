@@ -13,14 +13,16 @@ class BirdsEyeView {
                const float bev_pixels_per_meter,
                const float bev_horizon_distance);
 
-  cv::Mat3b WarpPerspective(const cv::Mat3b& input_image);
+  cv::Mat3b WarpPerspective(const cv::Mat3b& input_image) const;
+
+  cv::Size GetBevSize() const;
 
  protected:
   Eigen::Matrix2Xf GroundToPixelCoordinates(
-      const Eigen::Matrix2Xf& ground_coordinates);
+      const Eigen::Matrix2Xf& ground_coordinates) const;
 
   Eigen::Matrix2Xf PixelToGroundCoordinates(
-      const Eigen::Matrix2Xf& pixel_coordinates);
+      const Eigen::Matrix2Xf& pixel_coordinates) const;
 
  protected:
   Eigen::Matrix3f intrinsic_matrix_;
