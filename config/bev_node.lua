@@ -2,7 +2,7 @@ function deg2rad(deg)
   return deg * (math.pi / 180)
 end
 
-SingleBEVParameters = {
+BEVParameters = {
     camera_calibration_config_path = "config/camera_calibration_kinect.yaml";
     input_image_topic = "/camera/rgb/image_raw/compressed";
     input_image_width = 1920;

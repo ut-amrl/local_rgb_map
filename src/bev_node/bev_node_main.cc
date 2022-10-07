@@ -17,29 +17,29 @@
 
 namespace {
 CONFIG_STRING(camera_calibration_config_path,
-              "SingleBEVParameters.camera_calibration_config_path");
-CONFIG_STRING(input_image_topic, "SingleBEVParameters.input_image_topic");
-CONFIG_UINT(input_image_width, "SingleBEVParameters.input_image_width");
-CONFIG_UINT(input_image_height, "SingleBEVParameters.input_image_height");
+              "BEVParameters.camera_calibration_config_path");
+CONFIG_STRING(input_image_topic, "BEVParameters.input_image_topic");
+CONFIG_UINT(input_image_width, "BEVParameters.input_image_width");
+CONFIG_UINT(input_image_height, "BEVParameters.input_image_height");
 
-CONFIG_STRING(bev_image_topic, "SingleBEVParameters.bev_image_topic");
-CONFIG_FLOAT(bev_pixels_per_meter, "SingleBEVParameters.bev_pixels_per_meter");
-CONFIG_FLOAT(bev_horizon_distance, "SingleBEVParameters.bev_horizon_distance");
+CONFIG_STRING(bev_image_topic, "BEVParameters.bev_image_topic");
+CONFIG_FLOAT(bev_pixels_per_meter, "BEVParameters.bev_pixels_per_meter");
+CONFIG_FLOAT(bev_horizon_distance, "BEVParameters.bev_horizon_distance");
 
 CONFIG_STRING(stitched_bev_image_topic,
-              "SingleBEVParameters.stitched_bev_image_topic");
+              "BEVParameters.stitched_bev_image_topic");
 CONFIG_FLOAT(stitched_bev_ema_gamma,
-             "SingleBEVParameters.stitched_bev_ema_gamma");
+             "BEVParameters.stitched_bev_ema_gamma");
 
-CONFIG_STRING(pose_topic, "SingleBEVParameters.pose_topic");
+CONFIG_STRING(pose_topic, "BEVParameters.pose_topic");
 
-CONFIG_FLOAT(T_ground_camera_x, "SingleBEVParameters.T_ground_camera.x");
-CONFIG_FLOAT(T_ground_camera_y, "SingleBEVParameters.T_ground_camera.y");
-CONFIG_FLOAT(T_ground_camera_z, "SingleBEVParameters.T_ground_camera.z");
+CONFIG_FLOAT(T_ground_camera_x, "BEVParameters.T_ground_camera.x");
+CONFIG_FLOAT(T_ground_camera_y, "BEVParameters.T_ground_camera.y");
+CONFIG_FLOAT(T_ground_camera_z, "BEVParameters.T_ground_camera.z");
 CONFIG_FLOAT(T_ground_camera_pitch,
-             "SingleBEVParameters.T_ground_camera.pitch");
+             "BEVParameters.T_ground_camera.pitch");
 
-CONFIG_UINT(cv_num_threads, "SingleBEVParameters.cv_num_threads");
+CONFIG_UINT(cv_num_threads, "BEVParameters.cv_num_threads");
 
 DEFINE_string(config, "config/bev_node.lua", "path to config file");
 
