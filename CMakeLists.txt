@@ -45,7 +45,7 @@ TARGET_LINK_LIBRARIES(lmap ${libs} ${OpenCV_LIBS})
 rosbuild_add_executable(bev_node
   src/bev_node/bev_node_main.cc
   src/bev/bev.cc
-  src/bev/bev_sticher.cc
+  src/bev/bev_stitcher.cc
 )
 target_link_libraries(bev_node
   ${libs}
@@ -55,7 +55,7 @@ target_link_libraries(bev_node
 add_executable(bev_benchmark
   src/bev_node/bev_benchmark_main.cc
   src/bev/bev.cc
-  src/bev/bev_sticher.cc
+  src/bev/bev_stitcher.cc
 )
 target_link_libraries(bev_benchmark
   ${libs}
