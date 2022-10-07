@@ -1,3 +1,5 @@
+#include "bev/bev_stitcher.h"
+
 #include <glog/logging.h>
 
 #include <cmath>
@@ -5,8 +7,6 @@
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
-
-#include "bev/bev_stitcher.h"
 
 namespace bev {
 
@@ -80,14 +80,21 @@ cv::Mat3b BevStitcher::CreateResizedBev() const {
 
 void BevStitcher::UpdateStitchedPose(const Eigen::Vector3f& position,
                                      const Eigen::Quaternionf& orientation) {
-  // TODO: find the bug here with turning
+  // TODO: find the bug here with translations while turning (?)
 
-  // TODO: make this math more stable (atan2)
   // TODO: use 3d transforms
-  const float last_angle = 2 * std::acos(last_orientation_.w());
+  const float last_angle =
+      std::atan2(2.0 * (last_orientation_.w() * last_orientation_.z() +
+                        last_orientation_.x() * last_orientation_.y()),
+                 1.0 - 2.0 * (last_orientation_.y() * last_orientation_.y() +
+                              last_orientation_.z() * last_orientation_.z()));
   Eigen::Affine2f T_current = Eigen::Translation2f(last_position_.topRows(2)) *
                               Eigen::Rotation2Df(last_angle);
-  const float new_angle = 2 * std::acos(orientation.w());
+  const float new_angle =
+      std::atan2(2.0 * (orientation.w() * orientation.z() +
+                        orientation.x() * orientation.y()),
+                 1.0 - 2.0 * (orientation.y() * orientation.y() +
+                              orientation.z() * orientation.z()));
   Eigen::Affine2f T_new =
       Eigen::Translation2f(position.topRows(2)) * Eigen::Rotation2Df(new_angle);
   Eigen::Affine2f T_delta = T_current.inverse() * T_new;
