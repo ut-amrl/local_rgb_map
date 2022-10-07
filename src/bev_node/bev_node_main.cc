@@ -1,5 +1,6 @@
 #include <config_reader/config_reader.h>
 #include <cv_bridge/cv_bridge.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <image_transport/image_transport.h>
@@ -12,6 +13,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "bev/bev.h"
+#include "bev/bev_stitcher.h"
 
 namespace {
 CONFIG_STRING(camera_calibration_config_path,
@@ -19,9 +21,17 @@ CONFIG_STRING(camera_calibration_config_path,
 CONFIG_STRING(input_image_topic, "SingleBEVParameters.input_image_topic");
 CONFIG_UINT(input_image_width, "SingleBEVParameters.input_image_width");
 CONFIG_UINT(input_image_height, "SingleBEVParameters.input_image_height");
+
 CONFIG_STRING(bev_image_topic, "SingleBEVParameters.bev_image_topic");
 CONFIG_FLOAT(bev_pixels_per_meter, "SingleBEVParameters.bev_pixels_per_meter");
 CONFIG_FLOAT(bev_horizon_distance, "SingleBEVParameters.bev_horizon_distance");
+
+CONFIG_STRING(stitched_bev_image_topic,
+              "SingleBEVParameters.stitched_bev_image_topic");
+CONFIG_FLOAT(stitched_bev_ema_gamma,
+             "SingleBEVParameters.stitched_bev_ema_gamma");
+
+CONFIG_STRING(pose_topic, "SingleBEVParameters.pose_topic");
 
 CONFIG_FLOAT(T_ground_camera_x, "SingleBEVParameters.T_ground_camera.x");
 CONFIG_FLOAT(T_ground_camera_y, "SingleBEVParameters.T_ground_camera.y");
@@ -34,7 +44,9 @@ CONFIG_UINT(cv_num_threads, "SingleBEVParameters.cv_num_threads");
 DEFINE_string(config, "config/bev_node.lua", "path to config file");
 
 image_transport::Publisher bev_image_publisher_;
+image_transport::Publisher stitched_bev_image_publisher_;
 std::unique_ptr<bev::BirdsEyeView> bev_transformer_;
+std::unique_ptr<bev::BevStitcher> bev_stitcher_;
 }  // namespace
 
 Eigen::Affine3f Read_T_ground_camera() {
@@ -65,10 +77,28 @@ void InputImageCallback(const sensor_msgs::CompressedImageConstPtr msg) {
       cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
   cv::Mat3b bev_image = bev_transformer_->WarpPerspective(cv_image->image);
+
+  bev_stitcher_->UpdateBev(bev_image);
+
   // Reuse the information from the input message header.
   sensor_msgs::ImagePtr bev_image_msg =
       cv_bridge::CvImage(msg->header, "bgr8", bev_image).toImageMsg();
   bev_image_publisher_.publish(bev_image_msg);
+}
+
+void PoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr msg) {
+  const Eigen::Vector3f position{(float)msg->pose.pose.position.x,
+                                 (float)msg->pose.pose.position.y,
+                                 (float)msg->pose.pose.position.z};
+  const Eigen::Quaternionf orientation{
+      (float)msg->pose.pose.orientation.w, (float)msg->pose.pose.orientation.x,
+      (float)msg->pose.pose.orientation.y, (float)msg->pose.pose.orientation.z};
+
+  cv::Mat3b stitched_bev_image =
+      bev_stitcher_->UpdatePose(position, orientation);
+  sensor_msgs::ImagePtr stitched_bev_image_msg =
+      cv_bridge::CvImage(msg->header, "bgr8", stitched_bev_image).toImageMsg();
+  stitched_bev_image_publisher_.publish(stitched_bev_image_msg);
 }
 
 int main(int argc, char** argv) {
@@ -87,12 +117,22 @@ int main(int argc, char** argv) {
 
   ros::Subscriber input_image_subscriber =
       node_handle.subscribe(CONFIG_input_image_topic, 1, &InputImageCallback);
+  ros::Subscriber pose_subscriber =
+      node_handle.subscribe(CONFIG_pose_topic, 1, &PoseCallback);
+
   bev_image_publisher_ = image_transport.advertise(CONFIG_bev_image_topic, 1);
+  stitched_bev_image_publisher_ =
+      image_transport.advertise(CONFIG_stitched_bev_image_topic, 1);
 
   bev_transformer_ = std::make_unique<bev::BirdsEyeView>(
       ReadIntrinsicMatrix(), Read_T_ground_camera(), CONFIG_input_image_height,
       CONFIG_input_image_width, CONFIG_bev_pixels_per_meter,
       CONFIG_bev_horizon_distance);
+
+  auto bev_size = bev_transformer_->GetBevSize();
+  bev_stitcher_ = std::make_unique<bev::BevStitcher>(
+      bev_size.height, bev_size.width, CONFIG_bev_pixels_per_meter,
+      CONFIG_bev_horizon_distance, CONFIG_stitched_bev_ema_gamma);
 
   ros::spin();
 
