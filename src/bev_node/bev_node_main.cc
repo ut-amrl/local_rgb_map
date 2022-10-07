@@ -28,16 +28,16 @@ CONFIG_FLOAT(bev_horizon_distance, "BEVParameters.bev_horizon_distance");
 
 CONFIG_STRING(stitched_bev_image_topic,
               "BEVParameters.stitched_bev_image_topic");
-CONFIG_FLOAT(stitched_bev_ema_gamma,
-             "BEVParameters.stitched_bev_ema_gamma");
+CONFIG_FLOAT(stitched_bev_horizon_distance,
+             "BEVParameters.stitched_bev_horizon_distance");
+CONFIG_FLOAT(stitched_bev_ema_gamma, "BEVParameters.stitched_bev_ema_gamma");
 
 CONFIG_STRING(pose_topic, "BEVParameters.pose_topic");
 
 CONFIG_FLOAT(T_ground_camera_x, "BEVParameters.T_ground_camera.x");
 CONFIG_FLOAT(T_ground_camera_y, "BEVParameters.T_ground_camera.y");
 CONFIG_FLOAT(T_ground_camera_z, "BEVParameters.T_ground_camera.z");
-CONFIG_FLOAT(T_ground_camera_pitch,
-             "BEVParameters.T_ground_camera.pitch");
+CONFIG_FLOAT(T_ground_camera_pitch, "BEVParameters.T_ground_camera.pitch");
 
 CONFIG_UINT(cv_num_threads, "BEVParameters.cv_num_threads");
 
@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
   auto bev_size = bev_transformer_->GetBevSize();
   bev_stitcher_ = std::make_unique<bev::BevStitcher>(
       bev_size.height, bev_size.width, CONFIG_bev_pixels_per_meter,
-      CONFIG_bev_horizon_distance, CONFIG_stitched_bev_ema_gamma);
+      CONFIG_stitched_bev_horizon_distance, CONFIG_stitched_bev_ema_gamma);
 
   ros::spin();
 

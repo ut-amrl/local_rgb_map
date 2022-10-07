@@ -13,6 +13,7 @@ BEVParameters = {
     bev_horizon_distance = 5.0;
 
     stitched_bev_image_topic = "/bev/stitched";
+    stitched_bev_horizon_distance = 5.0;
     stitched_bev_ema_gamma = 0.5;
 
     pose_topic = "/husky_inekf_estimation/pose";
