@@ -24,6 +24,6 @@ BEVParameters = {
         x = 0.15;
         y = 0.0;
         z = 0.31 + 0.2;
-        pitch = deg2rad(17.0);
+        pitch = deg2rad(13.4);
     };
 }

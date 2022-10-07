@@ -80,9 +80,7 @@ cv::Mat3b BevStitcher::CreateResizedBev() const {
 
 void BevStitcher::UpdateStitchedPose(const Eigen::Vector3f& position,
                                      const Eigen::Quaternionf& orientation) {
-  // TODO: find the bug here with translations while turning (?)
-
-  // TODO: use 3d transforms
+  // TODO: use 3d transforms instead of 2d ones
   const float last_angle =
       std::atan2(2.0 * (last_orientation_.w() * last_orientation_.z() +
                         last_orientation_.x() * last_orientation_.y()),
@@ -115,7 +113,7 @@ void BevStitcher::UpdateStitchedPose(const Eigen::Vector3f& position,
   Eigen::Rotation2Df rotation(rotation_mat);
 
   cv::Mat cv_transform = cv::getRotationMatrix2D(
-      cv::Point2f{(float)input_image_cols_ / 2, (float)input_image_cols_},
+      cv::Point2f{(float)stitched_bev_.size[1] / 2, (float)stitched_bev_.size[0] / 2},
       -rotation.angle() * (180 / M_PI), 1.0);
   cv_transform(cv::Rect(2, 0, 1, 2)) -= cv_translation;
 
