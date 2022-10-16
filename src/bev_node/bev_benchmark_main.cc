@@ -10,17 +10,17 @@
 #include "bev/bev.h"
 
 CONFIG_STRING(camera_calibration_config_path,
-              "SingleBEVParameters.camera_calibration_config_path");
-CONFIG_UINT(input_image_width, "SingleBEVParameters.input_image_width");
-CONFIG_UINT(input_image_height, "SingleBEVParameters.input_image_height");
-CONFIG_FLOAT(bev_pixels_per_meter, "SingleBEVParameters.bev_pixels_per_meter");
-CONFIG_FLOAT(bev_horizon_distance, "SingleBEVParameters.bev_horizon_distance");
+              "BEVParameters.camera_calibration_config_path");
+CONFIG_UINT(input_image_width, "BEVParameters.input_image_width");
+CONFIG_UINT(input_image_height, "BEVParameters.input_image_height");
+CONFIG_FLOAT(bev_pixels_per_meter, "BEVParameters.bev_pixels_per_meter");
+CONFIG_FLOAT(bev_horizon_distance, "BEVParameters.bev_horizon_distance");
 
-CONFIG_FLOAT(T_ground_camera_x, "SingleBEVParameters.T_ground_camera.x");
-CONFIG_FLOAT(T_ground_camera_y, "SingleBEVParameters.T_ground_camera.y");
-CONFIG_FLOAT(T_ground_camera_z, "SingleBEVParameters.T_ground_camera.z");
+CONFIG_FLOAT(T_ground_camera_x, "BEVParameters.T_ground_camera.x");
+CONFIG_FLOAT(T_ground_camera_y, "BEVParameters.T_ground_camera.y");
+CONFIG_FLOAT(T_ground_camera_z, "BEVParameters.T_ground_camera.z");
 CONFIG_FLOAT(T_ground_camera_pitch,
-             "SingleBEVParameters.T_ground_camera.pitch");
+             "BEVParameters.T_ground_camera.pitch");
 
 DEFINE_string(config, "config/bev_node.lua", "path to config file");
 
