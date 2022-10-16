@@ -96,6 +96,9 @@ void PoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr msg) {
 
   cv::Mat3b stitched_bev_image =
       bev_stitcher_->UpdatePose(position, orientation);
+  stitched_bev_image = stitched_bev_image(
+      cv::Rect(0, 0, stitched_bev_image.cols, stitched_bev_image.rows / 2));
+
   sensor_msgs::ImagePtr stitched_bev_image_msg =
       cv_bridge::CvImage(msg->header, "bgr8", stitched_bev_image).toImageMsg();
   stitched_bev_image_publisher_.publish(stitched_bev_image_msg);
