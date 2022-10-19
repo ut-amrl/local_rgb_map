@@ -14,6 +14,7 @@ class BevStitcher {
   void UpdateBev(const cv::Mat3b& image);
   cv::Mat3b UpdatePose(const Eigen::Vector3f& position,
                        const Eigen::Quaternionf& orientation);
+  float GetRobotMapAngle() const;
 
  protected:
   void StitchBev();

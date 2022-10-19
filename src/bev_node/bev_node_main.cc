@@ -6,6 +6,7 @@
 #include <image_transport/image_transport.h>
 #include <ros/ros.h>
 #include <sensor_msgs/CompressedImage.h>
+#include <std_msgs/Float32.h>
 
 #include <iostream>
 #include <memory>
@@ -28,6 +29,8 @@ CONFIG_FLOAT(bev_horizon_distance, "BEVParameters.bev_horizon_distance");
 
 CONFIG_STRING(stitched_bev_image_topic,
               "BEVParameters.stitched_bev_image_topic");
+CONFIG_STRING(stitched_bev_angle_topic,
+              "BEVParameters.stitched_bev_angle_topic");
 CONFIG_FLOAT(stitched_bev_horizon_distance,
              "BEVParameters.stitched_bev_horizon_distance");
 CONFIG_FLOAT(stitched_bev_ema_gamma, "BEVParameters.stitched_bev_ema_gamma");
@@ -45,6 +48,7 @@ DEFINE_string(config, "config/bev_node.lua", "path to config file");
 
 image_transport::Publisher bev_image_publisher_;
 image_transport::Publisher stitched_bev_image_publisher_;
+ros::Publisher stitched_bev_angle_publisher_;
 std::unique_ptr<bev::BirdsEyeView> bev_transformer_;
 std::unique_ptr<bev::BevStitcher> bev_stitcher_;
 }  // namespace
@@ -98,7 +102,11 @@ void PoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr msg) {
       bev_stitcher_->UpdatePose(position, orientation);
   sensor_msgs::ImagePtr stitched_bev_image_msg =
       cv_bridge::CvImage(msg->header, "bgr8", stitched_bev_image).toImageMsg();
+
+  std_msgs::Float32 stitched_bev_angle_msg;
+  stitched_bev_angle_msg.data = bev_stitcher_->GetRobotMapAngle();
   stitched_bev_image_publisher_.publish(stitched_bev_image_msg);
+  stitched_bev_angle_publisher_.publish(stitched_bev_angle_msg);
 }
 
 int main(int argc, char** argv) {
@@ -123,6 +131,8 @@ int main(int argc, char** argv) {
   bev_image_publisher_ = image_transport.advertise(CONFIG_bev_image_topic, 1);
   stitched_bev_image_publisher_ =
       image_transport.advertise(CONFIG_stitched_bev_image_topic, 1);
+  stitched_bev_angle_publisher_ = node_handle.advertise<std_msgs::Float32>(
+      CONFIG_stitched_bev_angle_topic, 1);
 
   bev_transformer_ = std::make_unique<bev::BirdsEyeView>(
       ReadIntrinsicMatrix(), Read_T_ground_camera(), CONFIG_input_image_height,
