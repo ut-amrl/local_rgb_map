@@ -82,10 +82,14 @@ void BevStitcher::StitchBev() {
   for (int y = 0; y < bev_resized.rows; y++) {
     for (int x = 0; x < bev_resized.cols; x++) {
       auto bev_pixel = bev_resized.at<cv::Vec3b>(y, x);
-      if (cv::norm(bev_pixel) > stitch_overlay_threshold_)
-        stitched_bev_.at<cv::Vec3b>(y, x) =
-            ema_gamma_ * stitched_bev_.at<cv::Vec3b>(y, x) +
-            (1 - ema_gamma_) * bev_pixel;
+      if (cv::norm(bev_pixel) > stitch_overlay_threshold_) {
+        cv::Vec3b& stitched_pixel = stitched_bev_.at<cv::Vec3b>(y, x);
+        if (cv::norm(stitched_pixel) > stitch_overlay_threshold_)
+          stitched_pixel =
+              ema_gamma_ * stitched_pixel + (1 - ema_gamma_) * bev_pixel;
+        else
+          stitched_pixel = bev_pixel;
+      }
     }
   }
 }
