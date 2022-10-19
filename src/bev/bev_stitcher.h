@@ -8,7 +8,8 @@ class BevStitcher {
  public:
   BevStitcher(const int input_image_rows, const int input_image_cols,
               const float pixels_per_meter, const float horizon_distance,
-              const float ema_gamma,
+              const float ema_gamma, const float update_distance,
+              const float update_angle,
               const float stitch_overlay_threshold = 1.0);
 
   void UpdateBev(const cv::Mat3b& image);
@@ -28,6 +29,8 @@ class BevStitcher {
 
   Eigen::Vector3f last_position_;
   Eigen::Quaternionf last_orientation_;
+  Eigen::Vector3f last_stitch_position_;
+  Eigen::Quaternionf last_stitch_orientation_;
 
   const int input_image_rows_;
   const int input_image_cols_;
@@ -35,6 +38,8 @@ class BevStitcher {
   const float horizon_distance_;
 
   const float ema_gamma_;
+  const float update_distance_;
+  const float update_angle_;
   const float stitch_overlay_threshold_;
 };
 }  // namespace bev
