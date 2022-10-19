@@ -48,6 +48,14 @@ cv::Mat3b BevStitcher::UpdatePose(const Eigen::Vector3f& position,
   return stitched_bev_;
 }
 
+float BevStitcher::GetRobotMapAngle() const {
+  return std::atan2(
+      2.0 * (last_orientation_.w() * last_orientation_.z() +
+             last_orientation_.x() * last_orientation_.y()),
+      1.0 - 2.0 * (last_orientation_.y() * last_orientation_.y() +
+                   last_orientation_.z() * last_orientation_.z()));
+}
+
 void BevStitcher::StitchBev() {
   cv::Mat3b bev_resized = CreateResizedBev();
 
@@ -75,46 +83,41 @@ cv::Mat3b BevStitcher::CreateResizedBev() const {
   cv::warpAffine(last_bev_, bev_resized, translation_matrix,
                  bev_resized.size());
 
+  const float last_angle =
+      std::atan2(2.0 * (last_orientation_.w() * last_orientation_.z() +
+                        last_orientation_.x() * last_orientation_.y()),
+                 1.0 - 2.0 * (last_orientation_.y() * last_orientation_.y() +
+                              last_orientation_.z() * last_orientation_.z()));
+  cv::Mat rotation = cv::getRotationMatrix2D(
+      cv::Point2f{bev_resized.size[0] / 2.0f, bev_resized.size[1] / 2.0f},
+      last_angle * (180 / M_PI), 1);
+  cv::warpAffine(bev_resized, bev_resized, rotation, bev_resized.size());
+
   return bev_resized;
 }
 
 void BevStitcher::UpdateStitchedPose(const Eigen::Vector3f& position,
                                      const Eigen::Quaternionf& orientation) {
   // TODO: use 3d transforms instead of 2d ones
-  const float last_angle =
-      std::atan2(2.0 * (last_orientation_.w() * last_orientation_.z() +
-                        last_orientation_.x() * last_orientation_.y()),
-                 1.0 - 2.0 * (last_orientation_.y() * last_orientation_.y() +
-                              last_orientation_.z() * last_orientation_.z()));
-  Eigen::Affine2f T_current = Eigen::Translation2f(last_position_.topRows(2)) *
-                              Eigen::Rotation2Df(last_angle);
-  const float new_angle =
-      std::atan2(2.0 * (orientation.w() * orientation.z() +
-                        orientation.x() * orientation.y()),
-                 1.0 - 2.0 * (orientation.y() * orientation.y() +
-                              orientation.z() * orientation.z()));
-  Eigen::Affine2f T_new =
-      Eigen::Translation2f(position.topRows(2)) * Eigen::Rotation2Df(new_angle);
-  Eigen::Affine2f T_delta = T_current.inverse() * T_new;
+  Eigen::Affine2f T_current, T_new, T_delta;
+  T_current = Eigen::Translation2f(last_position_.topRows(2));
+  T_new = Eigen::Translation2f(position.topRows(2));
+  T_delta = T_current.inverse() * T_new;
 
   // flip across the x axis
   cv::Mat flipped_image;
   cv::flip(stitched_bev_, flipped_image, 0);
 
   cv::Mat cv_translation;
-  Eigen::Matrix2f rotation_mat = Eigen::Rotation2Df(-M_PI_2) *
-                                 T_delta.rotation().matrix().inverse() *
-                                 Eigen::Rotation2Df(M_PI_2);
-  Eigen::Vector2f translation = -rotation_mat * Eigen::Rotation2Df(-M_PI_2) *
+  Eigen::Vector2f translation = -Eigen::Matrix2f::Identity() *
+                                Eigen::Rotation2Df(-M_PI_2) *
                                 T_delta.translation().matrix();
   translation *= pixels_per_meter_;
   cv::eigen2cv(translation, cv_translation);
 
-  Eigen::Rotation2Df rotation(rotation_mat);
-
   cv::Mat cv_transform = cv::getRotationMatrix2D(
-      cv::Point2f{(float)stitched_bev_.size[1] / 2, (float)stitched_bev_.size[0] / 2},
-      -rotation.angle() * (180 / M_PI), 1.0);
+      cv::Point2f{stitched_bev_.size[1] / 2.0f, stitched_bev_.size[0] / 2.0f},
+      0, 1.0);
   cv_transform(cv::Rect(2, 0, 1, 2)) -= cv_translation;
 
   cv::Mat previous_image = flipped_image.clone();
