@@ -76,7 +76,7 @@ Eigen::Matrix3f ReadIntrinsicMatrix() {
   }
 }
 
-void InputImageCallback(const sensor_msgs::CompressedImageConstPtr msg) {
+void InputImageCallback(const sensor_msgs::ImageConstPtr& msg) {
   cv_bridge::CvImagePtr cv_image =
       cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
@@ -123,8 +123,10 @@ int main(int argc, char** argv) {
   ros::NodeHandle node_handle;
   image_transport::ImageTransport image_transport(node_handle);
 
-  ros::Subscriber input_image_subscriber =
-      node_handle.subscribe(CONFIG_input_image_topic, 1, &InputImageCallback);
+  image_transport::Subscriber input_image_subscriber =
+      image_transport.subscribe(CONFIG_input_image_topic, 1,
+                                &InputImageCallback,
+                                image_transport::TransportHints("compressed"));
   ros::Subscriber pose_subscriber =
       node_handle.subscribe(CONFIG_pose_topic, 1, &PoseCallback);
 
