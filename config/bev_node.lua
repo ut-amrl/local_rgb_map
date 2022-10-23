@@ -4,7 +4,7 @@ end
 
 BEVParameters = {
     camera_calibration_config_path = "config/camera_calibration_kinect.yaml";
-    input_image_topic = "/camera/rgb/image_raw/compressed";
+    input_image_topic = "/camera/rgb/image_raw";
     input_image_width = 1920;
     input_image_height = 1080;
 
