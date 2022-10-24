@@ -13,18 +13,20 @@ namespace bev {
 BevStitcher::BevStitcher(const int input_image_rows, const int input_image_cols,
                          const float pixels_per_meter,
                          const float horizon_distance, const float ema_gamma,
+                         const float update_distance, const float update_angle,
                          const float stitch_overlay_threshold)
     : input_image_rows_(input_image_rows),
       input_image_cols_(input_image_cols),
       pixels_per_meter_(pixels_per_meter),
       horizon_distance_(horizon_distance),
       ema_gamma_(ema_gamma),
+      update_distance_(update_distance),
+      update_angle_(update_angle),
       stitch_overlay_threshold_(stitch_overlay_threshold) {
   // the stitched BEV map places the robot in the center of the image so the
   // image spans horizon_distance_ in the x and y axes from the robot
-  stitched_bev_ =
-      cv::Mat::zeros(2 * pixels_per_meter_ * horizon_distance_,
-                     2 * pixels_per_meter_ * horizon_distance_, CV_32F);
+  stitched_bev_ = cv::Mat3b::zeros(2 * pixels_per_meter_ * horizon_distance_,
+                                   2 * pixels_per_meter_ * horizon_distance_);
 }
 
 void BevStitcher::UpdateBev(const cv::Mat3b& image) {
@@ -34,8 +36,25 @@ void BevStitcher::UpdateBev(const cv::Mat3b& image) {
       << ") does not match configuration (" << input_image_rows_ << " x "
       << input_image_cols_ << ")";
 
-  last_bev_ = image.clone();
-  StitchBev();
+  const float last_angle =
+      std::atan2(2.0 * (last_orientation_.w() * last_orientation_.z() +
+                        last_orientation_.x() * last_orientation_.y()),
+                 1.0 - 2.0 * (last_orientation_.y() * last_orientation_.y() +
+                              last_orientation_.z() * last_orientation_.z()));
+  const float last_stitch_angle = std::atan2(
+      2.0 * (last_stitch_orientation_.w() * last_stitch_orientation_.z() +
+             last_stitch_orientation_.x() * last_stitch_orientation_.y()),
+      1.0 -
+          2.0 * (last_stitch_orientation_.y() * last_stitch_orientation_.y() +
+                 last_stitch_orientation_.z() * last_stitch_orientation_.z()));
+
+  if ((last_position_ - last_stitch_position_).norm() >= update_distance_ ||
+      std::abs(last_angle - last_stitch_angle) >= update_angle_ * M_PI / 180) {
+    last_bev_ = image.clone();
+    last_stitch_position_ = last_position_;
+    last_stitch_orientation_ = last_orientation_;
+    StitchBev();
+  }
 }
 
 cv::Mat3b BevStitcher::UpdatePose(const Eigen::Vector3f& position,
@@ -62,10 +81,14 @@ void BevStitcher::StitchBev() {
   for (int y = 0; y < bev_resized.rows; y++) {
     for (int x = 0; x < bev_resized.cols; x++) {
       auto bev_pixel = bev_resized.at<cv::Vec3b>(y, x);
-      if (cv::norm(bev_pixel) > stitch_overlay_threshold_)
-        stitched_bev_.at<cv::Vec3b>(y, x) =
-            ema_gamma_ * stitched_bev_.at<cv::Vec3b>(y, x) +
-            (1 - ema_gamma_) * bev_pixel;
+      if (cv::norm(bev_pixel) > stitch_overlay_threshold_) {
+        cv::Vec3b& stitched_pixel = stitched_bev_.at<cv::Vec3b>(y, x);
+        if (cv::norm(stitched_pixel) > stitch_overlay_threshold_)
+          stitched_pixel =
+              ema_gamma_ * stitched_pixel + (1 - ema_gamma_) * bev_pixel;
+        else
+          stitched_pixel = bev_pixel;
+      }
     }
   }
 }
