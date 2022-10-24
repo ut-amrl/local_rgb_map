@@ -25,9 +25,8 @@ BevStitcher::BevStitcher(const int input_image_rows, const int input_image_cols,
       stitch_overlay_threshold_(stitch_overlay_threshold) {
   // the stitched BEV map places the robot in the center of the image so the
   // image spans horizon_distance_ in the x and y axes from the robot
-  stitched_bev_ =
-      cv::Mat::zeros(2 * pixels_per_meter_ * horizon_distance_,
-                     2 * pixels_per_meter_ * horizon_distance_, CV_32F);
+  stitched_bev_ = cv::Mat3b::zeros(2 * pixels_per_meter_ * horizon_distance_,
+                                   2 * pixels_per_meter_ * horizon_distance_);
 }
 
 void BevStitcher::UpdateBev(const cv::Mat3b& image) {
