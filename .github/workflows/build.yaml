@@ -1,0 +1,52 @@
+name: Build
+on: push
+
+jobs:
+  build:
+    name: Test Building
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Run package update
+        run: |
+          sudo apt update
+          sudo apt full-upgrade -y
+
+      - name: Install dependencies
+        run: |
+          sudo apt install git g++ cmake curl libopt-dev \
+            liblua5.1-dev libeigen3-dev \
+            libgoogle-perftools-dev \
+            libgoogle-glog-dev libgflags-dev \
+            libboost-all-dev libopencv-dev
+
+      - name: Install ROS
+        run: |
+          sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+          curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
+          sudo apt update
+          sudo apt install ros-noetic-desktop
+          sudo apt install python3-rosdep python3-rosinstall-generator python3-wstool build-essential
+          sudo rosdep init
+          rosdep update
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Install amrl_msgs
+        run: |
+          source /opt/ros/noetic/setup.bash
+          export ROS_PACKAGE_PATH=$ROS_PACKAGE_PATH:$GITHUB_WORKSPACE:$GITHUB_WORKSPACE/../amrl_msgs
+          cd $GITHUB_WORKSPACE/..
+          git clone https://github.com/ut-amrl/amrl_msgs.git
+          cd amrl_msgs
+          make
+
+      - name: Run build
+        run: |
+          source /opt/ros/noetic/setup.bash
+          export ROS_PACKAGE_PATH=$ROS_PACKAGE_PATH:$GITHUB_WORKSPACE:$GITHUB_WORKSPACE/../amrl_msgs
+          cd $GITHUB_WORKSPACE
+          make
