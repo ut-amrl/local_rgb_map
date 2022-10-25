@@ -14,7 +14,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt install git g++ cmake curl libopt-dev \
+          sudo apt install git g++ cmake curl libpopt-dev \
             liblua5.1-dev libeigen3-dev \
             libgoogle-perftools-dev \
             libgoogle-glog-dev libgflags-dev \
