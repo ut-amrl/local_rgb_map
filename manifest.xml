@@ -15,7 +15,7 @@
   <depend package="rosbag"/>
   <depend package="tf"/>
   <depend package="amrl_msgs"/>
-  <depend package="amrl_maps"/>
+  <!-- <depend package="amrl_maps"/> -->
   <depend package="cv_bridge"/>
   <depend package="image_transport"/>
 
