@@ -3,10 +3,11 @@ function deg2rad(deg)
 end
 
 BEVParameters = {
-    camera_calibration_config_path = "config/camera_calibration_kinect.yaml";
+    camera_calibration_config_path = "config/camera_calibration_kinect_spot.yaml";
+
     input_image_topic = "/camera/rgb/image_raw";
-    input_image_width = 1920;
-    input_image_height = 1080;
+    input_image_width = 2048;
+    input_image_height = 1536;
 
     bev_image_topic = "/bev/single"; -- image_transport takes the base topic name
     bev_pixels_per_meter = 150.0;
@@ -20,14 +21,16 @@ BEVParameters = {
     stitched_bev_update_angle = 10; -- degrees
 
 
-    pose_topic = "/husky_inekf_estimation/pose";
+    -- stitching is not required for the spot at this time
+    -- pose_topic = "/husky/inekf_estimation/pose";
+    pose_topic = "/foo_9498125";
 
     cv_num_threads = 2;
 
     T_ground_camera = {
-        x = 0.15;
+        x = 0.34;
         y = 0.0;
-        z = 0.31 + 0.2;
-        pitch = deg2rad(13.4);
+        z = 0.233 + 0.5; -- spot to camera + spot to ground
+        pitch = deg2rad(17.0);
     };
 }
