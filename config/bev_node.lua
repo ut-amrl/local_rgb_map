@@ -27,7 +27,19 @@ BEVParameters = {
     T_ground_camera = {
         x = 0.15;
         y = 0.0;
-        z = 0.31 + 0.2;
+        z = 0.7;
         pitch = deg2rad(13.4);
+    };
+
+    T_imu_camera = {
+        x = 0.15;
+        y = 0.0;
+        z = 0.0;
+    };
+
+    T_ground_imu_initial = {
+        x = 0.0;
+        y = 0.0;
+        z = 0.7;
     };
 }

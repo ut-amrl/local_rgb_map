@@ -46,6 +46,7 @@ rosbuild_add_executable(bev_node
   src/bev_node/bev_node_main.cc
   src/bev/bev.cc
   src/bev/bev_stitcher.cc
+  src/bev/imu_bev.cc
 )
 target_link_libraries(bev_node
   ${libs}

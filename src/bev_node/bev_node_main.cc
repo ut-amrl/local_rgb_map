@@ -7,6 +7,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/CompressedImage.h>
 #include <std_msgs/Float32.h>
+#include <sensor_msgs/Imu.h>
 
 #include <iostream>
 #include <memory>
@@ -15,6 +16,7 @@
 
 #include "bev/bev.h"
 #include "bev/bev_stitcher.h"
+#include "bev/imu_bev.h"
 
 namespace {
 CONFIG_STRING(camera_calibration_config_path,
@@ -46,6 +48,14 @@ CONFIG_FLOAT(T_ground_camera_y, "BEVParameters.T_ground_camera.y");
 CONFIG_FLOAT(T_ground_camera_z, "BEVParameters.T_ground_camera.z");
 CONFIG_FLOAT(T_ground_camera_pitch, "BEVParameters.T_ground_camera.pitch");
 
+CONFIG_FLOAT(T_imu_camera_x, "BEVParameters.T_imu_camera.x");
+CONFIG_FLOAT(T_imu_camera_y, "BEVParameters.T_imu_camera.y");
+CONFIG_FLOAT(T_imu_camera_z, "BEVParameters.T_imu_camera.z");
+
+CONFIG_FLOAT(T_ground_imu_initial_x, "BEVParameters.T_ground_imu_initial.x");
+CONFIG_FLOAT(T_ground_imu_initial_y, "BEVParameters.T_ground_imu_initial.y");
+CONFIG_FLOAT(T_ground_imu_initial_z, "BEVParameters.T_ground_imu_initial.z");
+
 CONFIG_UINT(cv_num_threads, "BEVParameters.cv_num_threads");
 
 DEFINE_string(config, "config/bev_node.lua", "path to config file");
@@ -53,7 +63,7 @@ DEFINE_string(config, "config/bev_node.lua", "path to config file");
 image_transport::Publisher bev_image_publisher_;
 image_transport::Publisher stitched_bev_image_publisher_;
 ros::Publisher stitched_bev_angle_publisher_;
-std::unique_ptr<bev::BirdsEyeView> bev_transformer_;
+std::unique_ptr<bev::ImuBirdsEyeView> bev_transformer_;
 std::unique_ptr<bev::BevStitcher> bev_stitcher_;
 }  // namespace
 
@@ -63,6 +73,17 @@ Eigen::Affine3f Read_T_ground_camera() {
                               CONFIG_T_ground_camera_z) *
          Eigen::AngleAxisf(CONFIG_T_ground_camera_pitch,
                            Eigen::Vector3f::UnitY());
+}
+
+Eigen::Affine3f Read_T_imu_camera() {
+  return Eigen::Affine3f(Eigen::Translation3f(
+      CONFIG_T_imu_camera_x, CONFIG_T_imu_camera_y, CONFIG_T_imu_camera_z));
+}
+
+Eigen::Affine3f Read_T_ground_imu_initial() {
+  return Eigen::Affine3f(Eigen::Translation3f(CONFIG_T_ground_imu_initial_x,
+                                              CONFIG_T_ground_imu_initial_y,
+                                              CONFIG_T_ground_imu_initial_z));
 }
 
 Eigen::Matrix3f ReadIntrinsicMatrix() {
@@ -86,7 +107,7 @@ void InputImageCallback(const sensor_msgs::ImageConstPtr& msg) {
 
   cv::Mat3b bev_image = bev_transformer_->WarpPerspective(cv_image->image);
 
-  bev_stitcher_->UpdateBev(bev_image);
+  // bev_stitcher_->UpdateBev(bev_image);
 
   // Reuse the information from the input message header.
   sensor_msgs::ImagePtr bev_image_msg =
@@ -102,15 +123,20 @@ void PoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr msg) {
       (float)msg->pose.pose.orientation.w, (float)msg->pose.pose.orientation.x,
       (float)msg->pose.pose.orientation.y, (float)msg->pose.pose.orientation.z};
 
-  cv::Mat3b stitched_bev_image =
-      bev_stitcher_->UpdatePose(position, orientation);
-  sensor_msgs::ImagePtr stitched_bev_image_msg =
-      cv_bridge::CvImage(msg->header, "bgr8", stitched_bev_image).toImageMsg();
+  // cv::Mat3b stitched_bev_image =
+  //     bev_stitcher_->UpdatePose(position, orientation);
+  // sensor_msgs::ImagePtr stitched_bev_image_msg =
+  //     cv_bridge::CvImage(msg->header, "bgr8", stitched_bev_image).toImageMsg();
+  //
+  // std_msgs::Float32 stitched_bev_angle_msg;
+  // stitched_bev_angle_msg.data = bev_stitcher_->GetRobotMapAngle();
+  // stitched_bev_image_publisher_.publish(stitched_bev_image_msg);
+  // stitched_bev_angle_publisher_.publish(stitched_bev_angle_msg);
+}
 
-  std_msgs::Float32 stitched_bev_angle_msg;
-  stitched_bev_angle_msg.data = bev_stitcher_->GetRobotMapAngle();
-  stitched_bev_image_publisher_.publish(stitched_bev_image_msg);
-  stitched_bev_angle_publisher_.publish(stitched_bev_angle_msg);
+void ImuCallback(const sensor_msgs::Imu& msg) {
+    Eigen::Quaternionf q {(float)msg.orientation.w, (float)msg.orientation.x, (float)msg.orientation.y, (float)msg.orientation.z};
+    bev_transformer_->UpdateOrientation(q);
 }
 
 int main(int argc, char** argv) {
@@ -133,6 +159,7 @@ int main(int argc, char** argv) {
                                 image_transport::TransportHints("compressed"));
   ros::Subscriber pose_subscriber =
       node_handle.subscribe(CONFIG_pose_topic, 1, &PoseCallback);
+  ros::Subscriber imu_subscriber = node_handle.subscribe("/vectornav/IMU", 1, &ImuCallback);
 
   bev_image_publisher_ = image_transport.advertise(CONFIG_bev_image_topic, 1);
   stitched_bev_image_publisher_ =
@@ -140,10 +167,10 @@ int main(int argc, char** argv) {
   stitched_bev_angle_publisher_ = node_handle.advertise<std_msgs::Float32>(
       CONFIG_stitched_bev_angle_topic, 1);
 
-  bev_transformer_ = std::make_unique<bev::BirdsEyeView>(
-      ReadIntrinsicMatrix(), Read_T_ground_camera(), CONFIG_input_image_height,
-      CONFIG_input_image_width, CONFIG_bev_pixels_per_meter,
-      CONFIG_bev_horizon_distance);
+  bev_transformer_ = std::make_unique<bev::ImuBirdsEyeView>(
+      ReadIntrinsicMatrix(), Read_T_imu_camera(),
+      CONFIG_input_image_height, CONFIG_input_image_width,
+      CONFIG_bev_pixels_per_meter, CONFIG_bev_horizon_distance);
 
   auto bev_size = bev_transformer_->GetBevSize();
   bev_stitcher_ = std::make_unique<bev::BevStitcher>(
