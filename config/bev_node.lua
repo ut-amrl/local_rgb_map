@@ -2,8 +2,17 @@ function deg2rad(deg)
   return deg * (math.pi / 180)
 end
 
+
+-- https://stackoverflow.com/a/23535333 Returns the absolute path with a
+-- trailing slash to the directory containing this script.
+function config_dir()
+  local script_path = debug.getinfo(2, "S").source:sub(2)
+  return script_path:match("(.*/)")
+end
+
+
 BEVParameters = {
-    camera_calibration_config_path = "config/camera_calibration_kinect_spot.yaml";
+    camera_calibration_config_path = config_dir() .. "camera_calibration_kinect_spot.yaml";
 
     input_image_topic = "/camera/rgb/image_raw";
     input_image_width = 2048;
