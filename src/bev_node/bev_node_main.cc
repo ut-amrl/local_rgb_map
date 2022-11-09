@@ -26,6 +26,7 @@ CONFIG_UINT(input_image_height, "BEVParameters.input_image_height");
 CONFIG_STRING(bev_image_topic, "BEVParameters.bev_image_topic");
 CONFIG_FLOAT(bev_pixels_per_meter, "BEVParameters.bev_pixels_per_meter");
 CONFIG_FLOAT(bev_horizon_distance, "BEVParameters.bev_horizon_distance");
+CONFIG_INTLIST(bev_empty_region_rgb, "BEVParameters.bev_empty_region_rgb");
 
 CONFIG_STRING(stitched_bev_image_topic,
               "BEVParameters.stitched_bev_image_topic");
@@ -143,7 +144,7 @@ int main(int argc, char** argv) {
   bev_transformer_ = std::make_unique<bev::BirdsEyeView>(
       ReadIntrinsicMatrix(), Read_T_ground_camera(), CONFIG_input_image_height,
       CONFIG_input_image_width, CONFIG_bev_pixels_per_meter,
-      CONFIG_bev_horizon_distance);
+      CONFIG_bev_horizon_distance, CONFIG_bev_empty_region_rgb);
 
   auto bev_size = bev_transformer_->GetBevSize();
   bev_stitcher_ = std::make_unique<bev::BevStitcher>(

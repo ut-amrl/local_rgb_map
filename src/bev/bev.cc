@@ -13,10 +13,13 @@ BirdsEyeView::BirdsEyeView(const Eigen::Matrix3f& intrinsic_matrix,
                            const int input_image_rows,
                            const int input_image_cols,
                            const float bev_pixels_per_meter,
-                           const float bev_horizon_distance)
+                           const float bev_horizon_distance,
+                           const std::vector<int>& empty_region_rgb)
     : intrinsic_matrix_(intrinsic_matrix),
       input_image_rows_(input_image_rows),
-      input_image_cols_(input_image_cols) {
+      input_image_cols_(input_image_cols),
+      bev_empty_region_pixel_(empty_region_rgb[2], empty_region_rgb[1],
+                              empty_region_rgb[0]) {
   // The pixel frame's X axis points to the right, the Y axis points down, and
   // the Z axis points out of the lens. Prerotate the T_ground_camera transform
   // using right-to-left extrinsic rotations.
@@ -92,7 +95,8 @@ cv::Mat3b BirdsEyeView::WarpPerspective(const cv::Mat3b& input_image) const {
 
   cv::Mat3b bev_image = cv::Mat3b::zeros(bev_image_rows_, bev_image_cols_);
   cv::warpPerspective(input_image, bev_image, perspective_matrix_,
-                      bev_image.size());
+                      bev_image.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT,
+                      bev_empty_region_pixel_);
   return bev_image;
 }
 

@@ -22,6 +22,8 @@ BEVParameters = {
     bev_pixels_per_meter = 150.0;
     bev_horizon_distance = 5.0;
 
+    bev_empty_region_rgb = {0, 0, 0};
+
     stitched_bev_image_topic = "/bev/stitched";
     stitched_bev_angle_topic = "/bev/stitched_angle";
     stitched_bev_horizon_distance = 6.0;

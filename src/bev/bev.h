@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include <eigen3/Eigen/Dense>
 #include <opencv2/opencv.hpp>
 
@@ -11,7 +13,8 @@ class BirdsEyeView {
                const Eigen::Affine3f& T_ground_camera,
                const int input_image_rows, const int input_image_cols,
                const float bev_pixels_per_meter,
-               const float bev_horizon_distance);
+               const float bev_horizon_distance,
+               const std::vector<int>& empty_region_rgb);
 
   cv::Mat3b WarpPerspective(const cv::Mat3b& input_image) const;
 
@@ -31,6 +34,7 @@ class BirdsEyeView {
   int input_image_cols_;
   int bev_image_rows_;
   int bev_image_cols_;
+  cv::Vec3b bev_empty_region_pixel_;
   cv::Mat perspective_matrix_;
 };
 }  // namespace bev

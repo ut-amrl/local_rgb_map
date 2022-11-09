@@ -15,6 +15,7 @@ CONFIG_UINT(input_image_width, "BEVParameters.input_image_width");
 CONFIG_UINT(input_image_height, "BEVParameters.input_image_height");
 CONFIG_FLOAT(bev_pixels_per_meter, "BEVParameters.bev_pixels_per_meter");
 CONFIG_FLOAT(bev_horizon_distance, "BEVParameters.bev_horizon_distance");
+CONFIG_INTLIST(bev_empty_region_rgb, "BEVParameters.bev_empty_region_rgb");
 
 CONFIG_FLOAT(T_ground_camera_x, "BEVParameters.T_ground_camera.x");
 CONFIG_FLOAT(T_ground_camera_y, "BEVParameters.T_ground_camera.y");
@@ -54,11 +55,10 @@ int main(int argc, char** argv) {
 
   config_reader::ConfigReader config_reader_({FLAGS_config});
 
-
   bev::BirdsEyeView bev(
       ReadIntrinsicMatrix(), Read_T_ground_camera(), CONFIG_input_image_height,
       CONFIG_input_image_width, CONFIG_bev_pixels_per_meter,
-      CONFIG_bev_horizon_distance);
+      CONFIG_bev_horizon_distance, CONFIG_bev_empty_region_rgb);
 
   cv::Mat3b input_image(CONFIG_input_image_height, CONFIG_input_image_width);
 
