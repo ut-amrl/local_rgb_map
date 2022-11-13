@@ -107,7 +107,7 @@ void InputImageCallback(const sensor_msgs::ImageConstPtr& msg) {
 
   cv::Mat3b bev_image = bev_transformer_->WarpPerspective(cv_image->image);
 
-  // bev_stitcher_->UpdateBev(bev_image);
+  bev_stitcher_->UpdateBev(bev_image);
 
   // Reuse the information from the input message header.
   sensor_msgs::ImagePtr bev_image_msg =
@@ -123,15 +123,15 @@ void PoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr msg) {
       (float)msg->pose.pose.orientation.w, (float)msg->pose.pose.orientation.x,
       (float)msg->pose.pose.orientation.y, (float)msg->pose.pose.orientation.z};
 
-  // cv::Mat3b stitched_bev_image =
-  //     bev_stitcher_->UpdatePose(position, orientation);
-  // sensor_msgs::ImagePtr stitched_bev_image_msg =
-  //     cv_bridge::CvImage(msg->header, "bgr8", stitched_bev_image).toImageMsg();
-  //
-  // std_msgs::Float32 stitched_bev_angle_msg;
-  // stitched_bev_angle_msg.data = bev_stitcher_->GetRobotMapAngle();
-  // stitched_bev_image_publisher_.publish(stitched_bev_image_msg);
-  // stitched_bev_angle_publisher_.publish(stitched_bev_angle_msg);
+  cv::Mat3b stitched_bev_image =
+      bev_stitcher_->UpdatePose(position, orientation);
+  sensor_msgs::ImagePtr stitched_bev_image_msg =
+      cv_bridge::CvImage(msg->header, "bgr8", stitched_bev_image).toImageMsg();
+
+  std_msgs::Float32 stitched_bev_angle_msg;
+  stitched_bev_angle_msg.data = bev_stitcher_->GetRobotMapAngle();
+  stitched_bev_image_publisher_.publish(stitched_bev_image_msg);
+  stitched_bev_angle_publisher_.publish(stitched_bev_angle_msg);
 }
 
 void ImuCallback(const sensor_msgs::Imu& msg) {
@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
       CONFIG_stitched_bev_angle_topic, 1);
 
   bev_transformer_ = std::make_unique<bev::ImuBirdsEyeView>(
-      ReadIntrinsicMatrix(), Read_T_imu_camera(),
+      ReadIntrinsicMatrix(), Read_T_imu_camera(), Read_T_ground_imu_initial(),
       CONFIG_input_image_height, CONFIG_input_image_width,
       CONFIG_bev_pixels_per_meter, CONFIG_bev_horizon_distance);
 

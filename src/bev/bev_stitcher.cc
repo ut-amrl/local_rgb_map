@@ -32,7 +32,7 @@ BevStitcher::BevStitcher(const int input_image_rows, const int input_image_cols,
 void BevStitcher::UpdateBev(const cv::Mat3b& image) {
   LOG_IF(ERROR,
          image.rows != input_image_rows_ || image.cols != input_image_cols_)
-      << "Input image dimensions (" << image.size()
+      << "Input image dimensions (" << image.rows << " x " << image.cols
       << ") does not match configuration (" << input_image_rows_ << " x "
       << input_image_cols_ << ")";
 

@@ -12,78 +12,20 @@ namespace bev {
 
 ImuBirdsEyeView::ImuBirdsEyeView(const Eigen::Matrix3f& intrinsic_matrix,
                                  const Eigen::Affine3f& T_imu_camera,
+                                 const Eigen::Affine3f& T_ground_imu_initial,
                                  const int input_image_rows,
                                  const int input_image_cols,
                                  const float bev_pixels_per_meter,
                                  const float bev_horizon_distance)
     : intrinsic_matrix_(intrinsic_matrix),
+      T_imu_camera_(T_imu_camera),
+      T_ground_imu_(T_ground_imu_initial),
       input_image_rows_(input_image_rows),
-      input_image_cols_(input_image_cols) {
-  // The pixel frame's X axis points to the right, the Y axis points down, and
-  // the Z axis points out of the lens. Prerotate the T_ground_camera transform
-  // using right-to-left extrinsic rotations.
-  T_ground_pixel_ = T_imu_camera *
-                    Eigen::AngleAxisf(-M_PI_2, Eigen::Vector3f::UnitZ()) *
-                    Eigen::AngleAxisf(-M_PI_2, Eigen::Vector3f::UnitX());
-
-  // Here we calculate the perspective matrix by finding the approximate
-  // coordinates corresponding to the visible limits of the ground plane up to
-  // the horizon distance. We assume the bottom two corners of the input image
-  // contain the ground plane, i.e. the camera is mounted with negligible
-  // roll.
-
-  // Finds the pixel coordinates of a point at the horizon directly in front of
-  // the camera.
-  const Eigen::Vector2f P_pixel_horizon =
-      GroundToPixelCoordinates(Eigen::Vector2f(bev_horizon_distance, 0));
-
-  // The pixel coordinates of the four corners of the visible ground plane in
-  // the original image as [x y] column vectors.
-  Eigen::Matrix2Xf P_pixel_planeCorners(2, 4);
-  // bottom-left corner
-  P_pixel_planeCorners.col(0) << 0, input_image_rows_ - 1;
-  // bottom-right corner
-  P_pixel_planeCorners.col(1) << input_image_cols_ - 1, input_image_rows_ - 1;
-  // top-left corner
-  P_pixel_planeCorners.col(2) << 0, P_pixel_horizon.y();
-  // top-right corner
-  P_pixel_planeCorners.col(3) << input_image_cols_ - 1, P_pixel_horizon.y();
-
-  const Eigen::Matrix2Xf P_ground_planeCorners =
-      PixelToGroundCoordinates(P_pixel_planeCorners);
-
-  // Ground coordinates corresponding to the limits of the output
-  // birds-eye-view image.
-  const float P_ground_planeMaxX = P_ground_planeCorners.row(0).maxCoeff();
-  // Assume the camera is forward-facing.
-  const float P_ground_planeMinX = 0;
-  const float P_ground_planeMaxY = P_ground_planeCorners.row(1).maxCoeff();
-  const float P_ground_planeMinY = P_ground_planeCorners.row(1).minCoeff();
-
-  // Note that the image and world xy axes are swapped
-  bev_image_rows_ =
-      (P_ground_planeMaxX - P_ground_planeMinX) * bev_pixels_per_meter;
-  bev_image_cols_ =
-      (P_ground_planeMaxY - P_ground_planeMinY) * bev_pixels_per_meter;
-
-  Eigen::Matrix2Xf P_bevPixel_planeCorners(2, 4);
-  for (Eigen::Index c = 0; c < 4; ++c) {
-    // Note again that the image and world xy axes are swapped and negated.
-    // (x: 0, y: 0) in the BEV image corresponds to (maxY, maxX) in the world
-    // coordinates.
-    auto bevPixel = P_bevPixel_planeCorners.col(c);
-    bevPixel.x() = P_ground_planeMaxY - P_ground_planeCorners.col(c).y();
-    bevPixel.y() = P_ground_planeMaxX - P_ground_planeCorners.col(c).x();
-    bevPixel *= bev_pixels_per_meter;
-  }
-
-  cv::Mat cv_P_pixel_planeCorners, cv_P_bevPixel_planeCorners;
-  cv::eigen2cv(P_pixel_planeCorners, cv_P_pixel_planeCorners);
-  cv::eigen2cv(P_bevPixel_planeCorners, cv_P_bevPixel_planeCorners);
-  // getPerspectiveTransform expects row vectors
-  // perspective_matrix_ = cv::getPerspectiveTransform(
-  //     cv_P_pixel_planeCorners.t(), cv_P_bevPixel_planeCorners.t());
-  perspective_matrix_ = CreatePerspectiveMatrix(Eigen::Quaternionf::Identity());
+      input_image_cols_(input_image_cols),
+      bev_pixels_per_meter_(bev_pixels_per_meter),
+      bev_horizon_distance_(bev_horizon_distance) {
+  // assume no orientation from imu
+  GeneratePerspectiveMatrix(Eigen::Quaternionf::Identity());
 }
 
 cv::Mat3b ImuBirdsEyeView::WarpPerspective(const cv::Mat3b& input_image) const {
@@ -100,14 +42,23 @@ cv::Mat3b ImuBirdsEyeView::WarpPerspective(const cv::Mat3b& input_image) const {
 }
 
 void ImuBirdsEyeView::UpdateOrientation(const Eigen::Quaternionf& orientation) {
-  // static Eigen::Quaternionf first = orientation;
-  // perspective_matrix_ = CreatePerspectiveMatrix(orientation *
-  // first.inverse());
-  perspective_matrix_ = CreatePerspectiveMatrix(orientation);
+  GeneratePerspectiveMatrix(orientation);
 }
 
 cv::Size ImuBirdsEyeView::GetBevSize() const {
   return cv::Size(bev_image_cols_, bev_image_rows_);
+}
+
+Eigen::Affine3f ImuBirdsEyeView::GroundToCameraTransform(
+    const Eigen::Quaternionf& orientation) const {
+  auto e_angles = orientation.matrix().eulerAngles(2, 1, 0);
+
+  auto robot_to_imu = IntrinsicRotation(0, e_angles[1], 0);
+  auto imu_to_cam_flat = IntrinsicRotation(-M_PI_2, 0, -M_PI_2);
+  auto cam_pitch = IntrinsicRotation(0, math_util::DegToRad(13.8), 0);
+
+  auto t1 = Eigen::Translation3f(Eigen::Vector3f{0.15, 0, 0.7});
+  return (t1 * cam_pitch) * (robot_to_imu *imu_to_cam_flat);
 }
 
 Eigen::Matrix2Xf ImuBirdsEyeView::GroundToPixelCoordinates(
@@ -156,6 +107,72 @@ Eigen::Matrix2Xf ImuBirdsEyeView::PixelToGroundCoordinates(
   return pixel_rays.topRows(2);
 }
 
+void ImuBirdsEyeView::GeneratePerspectiveMatrix(
+    const Eigen::Quaternionf& orientation) {
+  // The pixel frame's X axis points to the right, the Y axis points down, and
+  // the Z axis points out of the lens. Prerotate the T_ground_camera transform
+  // using right-to-left extrinsic rotations.
+  T_ground_pixel_ = GroundToCameraTransform(orientation);
+
+  // Here we calculate the perspective matrix by finding the approximate
+  // coordinates corresponding to the visible limits of the ground plane up to
+  // the horizon distance. We assume the bottom two corners of the input image
+  // contain the ground plane, i.e. the camera is mounted with negligible
+  // roll.
+
+  // Finds the pixel coordinates of a point at the horizon directly in front of
+  // the camera.
+  const Eigen::Vector2f P_pixel_horizon =
+      GroundToPixelCoordinates(Eigen::Vector2f(bev_horizon_distance_, 0));
+
+  // The pixel coordinates of the four corners of the visible ground plane in
+  // the original image as [x y] column vectors.
+  Eigen::Matrix2Xf P_pixel_planeCorners(2, 4);
+  // bottom-left corner
+  P_pixel_planeCorners.col(0) << 0, input_image_rows_ - 1;
+  // bottom-right corner
+  P_pixel_planeCorners.col(1) << input_image_cols_ - 1, input_image_rows_ - 1;
+  // top-left corner
+  P_pixel_planeCorners.col(2) << 0, P_pixel_horizon.y();
+  // top-right corner
+  P_pixel_planeCorners.col(3) << input_image_cols_ - 1, P_pixel_horizon.y();
+
+  const Eigen::Matrix2Xf P_ground_planeCorners =
+      PixelToGroundCoordinates(P_pixel_planeCorners);
+
+  // Ground coordinates corresponding to the limits of the output
+  // birds-eye-view image.
+  const float P_ground_planeMaxX = P_ground_planeCorners.row(0).maxCoeff();
+  // Assume the camera is forward-facing.
+  const float P_ground_planeMinX = 0;
+  const float P_ground_planeMaxY = P_ground_planeCorners.row(1).maxCoeff();
+  const float P_ground_planeMinY = P_ground_planeCorners.row(1).minCoeff();
+
+  // Note that the image and world xy axes are swapped
+  bev_image_rows_ =
+      (P_ground_planeMaxX - P_ground_planeMinX) * bev_pixels_per_meter_;
+  bev_image_cols_ =
+      (P_ground_planeMaxY - P_ground_planeMinY) * bev_pixels_per_meter_;
+
+  Eigen::Matrix2Xf P_bevPixel_planeCorners(2, 4);
+  for (Eigen::Index c = 0; c < 4; ++c) {
+    // Note again that the image and world xy axes are swapped and negated.
+    // (x: 0, y: 0) in the BEV image corresponds to (maxY, maxX) in the world
+    // coordinates.
+    auto bevPixel = P_bevPixel_planeCorners.col(c);
+    bevPixel.x() = P_ground_planeMaxY - P_ground_planeCorners.col(c).y();
+    bevPixel.y() = P_ground_planeMaxX - P_ground_planeCorners.col(c).x();
+    bevPixel *= bev_pixels_per_meter_;
+  }
+
+  cv::Mat cv_P_pixel_planeCorners, cv_P_bevPixel_planeCorners;
+  cv::eigen2cv(P_pixel_planeCorners, cv_P_pixel_planeCorners);
+  cv::eigen2cv(P_bevPixel_planeCorners, cv_P_bevPixel_planeCorners);
+  // getPerspectiveTransform expects row vectors
+  perspective_matrix_ = cv::getPerspectiveTransform(
+      cv_P_pixel_planeCorners.t(), cv_P_bevPixel_planeCorners.t());
+}
+
 Eigen::Quaternionf IntrinsicRotation(float x, float y, float z) {
   return Eigen::AngleAxisf(z, Eigen::Vector3f::UnitZ()) *
          Eigen::AngleAxisf(y, Eigen::Vector3f::UnitY()) *
@@ -166,43 +183,6 @@ Eigen::Quaternionf ExtrinsicRotation(float x, float y, float z) {
   return Eigen::AngleAxisf(x, Eigen::Vector3f::UnitX()) *
          Eigen::AngleAxisf(y, Eigen::Vector3f::UnitY()) *
          Eigen::AngleAxisf(z, Eigen::Vector3f::UnitZ());
-}
-
-cv::Mat ImuBirdsEyeView::CreatePerspectiveMatrix(
-    const Eigen::Quaternionf& orientation) const {
-  auto e_angles = orientation.matrix().eulerAngles(0, 1, 2);
-  LOG(INFO) << "eangles, " << e_angles[0] << ", " << e_angles[1] << ", "
-            << e_angles[2];
-
-  auto imu_world = IntrinsicRotation(
-      -e_angles[0], e_angles[1] - math_util::DegToRad(13.8), 0);
-  auto cam_imu = IntrinsicRotation(-M_PI_2, M_PI_2, 0).matrix();
-
-  auto r1 = cam_imu * imu_world;
-  auto t1 = Eigen::Vector3f{0.15, 0, 0.7};
-  t1 = r1 * t1;  // idk why but this does something different than multiplying
-                 // on the previous line
-
-  auto r2 = IntrinsicRotation(0, 0, M_PI_2).matrix();
-  auto t2 = Eigen::Vector3f{0, 0, 10};
-  t2 = r2 * t2;
-
-  auto n = Eigen::Vector3f{0, 0, 1};
-  auto n1 = r1 * n;
-
-  auto r12 = (r2 * r1.transpose());
-  auto t12 = (r2 * (-r1.transpose() * t1)) + t2;
-  auto d = std::abs(n1.dot(t1.transpose()));
-
-  Eigen::Matrix3f H12 = r12 - ((t12 * n1.transpose()) / d);
-  H12 /= H12(2, 2);
-
-  Eigen::Matrix3f H = intrinsic_matrix_ * H12 * intrinsic_matrix_.inverse();
-  H /= H(2, 2);
-
-  cv::Mat persp;
-  cv::eigen2cv(H, persp);
-  return persp;
 }
 
 }  // namespace bev
