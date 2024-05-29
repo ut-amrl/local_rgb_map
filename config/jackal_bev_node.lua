@@ -43,5 +43,6 @@ BEVParameters = {
         y = 0.05;
         z = 0.53;
         pitch = deg2rad(-2.6);
+        roll = deg2rad(180);
     };
 }
