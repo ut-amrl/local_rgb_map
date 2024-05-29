@@ -46,6 +46,7 @@ CONFIG_FLOAT(T_ground_camera_x, "BEVParameters.T_ground_camera.x");
 CONFIG_FLOAT(T_ground_camera_y, "BEVParameters.T_ground_camera.y");
 CONFIG_FLOAT(T_ground_camera_z, "BEVParameters.T_ground_camera.z");
 CONFIG_FLOAT(T_ground_camera_pitch, "BEVParameters.T_ground_camera.pitch");
+CONFIG_FLOAT(T_ground_camera_roll, "BEVParameters.T_ground_camera.roll");
 
 CONFIG_UINT(cv_num_threads, "BEVParameters.cv_num_threads");
 
@@ -62,8 +63,8 @@ Eigen::Affine3f Read_T_ground_camera() {
   return Eigen::Translation3f(CONFIG_T_ground_camera_x,
                               CONFIG_T_ground_camera_y,
                               CONFIG_T_ground_camera_z) *
-         Eigen::AngleAxisf(CONFIG_T_ground_camera_pitch,
-                           Eigen::Vector3f::UnitY());
+         Eigen::AngleAxisf(CONFIG_T_ground_camera_roll, Eigen::Vector3f::UnitX()) *
+         Eigen::AngleAxisf(CONFIG_T_ground_camera_pitch, Eigen::Vector3f::UnitY());
 }
 
 Eigen::Matrix3f ReadIntrinsicMatrix() {
